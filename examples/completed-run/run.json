@@ -1,0 +1,23 @@
+{
+  "id": "completed-run",
+  "title": "Decision logs are latency tools",
+  "format": "linkedin",
+  "stage": "complete",
+  "status": "complete",
+  "research_required": true,
+  "pending_human_action": "none",
+  "artifacts": {
+    "spike": "spike.md",
+    "research": "research-report.md",
+    "interview": "interview.md",
+    "brief": "content-brief.md",
+    "draft": "draft-02.md",
+    "draft_1": "draft-01.md",
+    "council": "council-01.md",
+    "revision_plan": "revision-plan-01.md",
+    "revision": "draft-02.md",
+    "council_2": "council-02.md",
+    "final": "final.md",
+    "lessons": "lesson-candidates.md"
+  }
+}
