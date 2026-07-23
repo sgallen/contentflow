@@ -85,7 +85,9 @@ class ContentFlowCLITests(unittest.TestCase):
                 (data_root / "creator" / relative).read_text(encoding="utf-8"),
                 (ROOT / "templates" / "creator" / relative).read_text(encoding="utf-8"),
             )
-        self.assertTrue((data_root / "vault" / "spikes").is_dir())
+        self.assertTrue((data_root / "vault" / "items").is_dir())
+        self.assertTrue((data_root / "vault" / "assets").is_dir())
+        self.assertTrue((data_root / "vault" / "index.md").is_file())
         self.assertTrue((data_root / "runs").is_dir())
 
     def test_init_refuses_to_overwrite_creator_files(self) -> None:

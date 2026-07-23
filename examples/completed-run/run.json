@@ -7,6 +7,12 @@
   "research_required": true,
   "revision_round": 1,
   "pending_human_action": "none",
+  "origin_vault_items": [],
+  "contributing_vault_items": [],
+  "linked_vault_items": [],
+  "parking_reason": null,
+  "parked_at": null,
+  "final_artifact": "final.md",
   "artifacts": {
     "spike": "spike.md",
     "research": "research-report.md",

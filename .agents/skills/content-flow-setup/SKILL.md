@@ -10,6 +10,10 @@ Build useful creator context without inventing preferences.
 ## Procedure
 
 1. Run `bin/cf data-root` with any user-selected `--data-dir` and report its exact path. `DATA_ROOT.md` is the canonical selection rule; do not duplicate or improvise it. If setup is incomplete, initialize through `bin/cf init` with the same selection. Never initialize creator content by hand.
+   Ensure `vault/items/`, `vault/assets/`, and generated `vault/index.md` exist by running
+   `bin/cf vault rebuild-index` with the same selection. Explain briefly that the private
+   vault retains future source/idea material and parked runs; do not turn setup into a vault
+   questionnaire.
 2. Before any edit, list the exact paths under `<data-root>/creator` that you intend to modify. Inspect `profile.md`, `voice.md`, `lessons.md`, `sources.md`, and `formats/linkedin.md`; summarize populated, missing, uncertain, and conflicting fields.
 3. Read [references/onboarding-questions.md](references/onboarding-questions.md). Ask one focused question at a time, prioritizing gaps that materially affect writing. Do not require every question.
 4. If samples are supplied, confirm they are the creator's and whether they are representative. Analyze repeated textual evidence using [references/sample-analysis.md](references/sample-analysis.md). Separate:
@@ -32,3 +36,7 @@ Build useful creator context without inventing preferences.
 Use [assets/creator-starter.md](assets/creator-starter.md) as a structural fallback, not content to copy blindly. Do not modify run artifacts during setup unless explicitly asked.
 
 All active files are under `<data-root>/creator`. Tracked files under `templates/creator/` are public blank starters: never write personal facts, inferred preferences, sample conclusions, or approved lessons into them.
+
+The vault is also private-root-only. Setup may ensure its directories/index exist, but must
+not solicit source integrations, credentials, personal links, or seed content, and must
+never copy private material into `templates/vault/`.

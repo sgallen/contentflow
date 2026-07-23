@@ -28,11 +28,18 @@ The private layout is:
 │   ├── lessons.md
 │   ├── sources.md
 │   └── formats/linkedin.md
-├── vault/spikes/
+├── vault/
+│   ├── items/
+│   ├── assets/
+│   └── index.md
 └── runs/
 ```
 
 Initialize it with `bin/cf init`. Initialization copies tracked starter files from `templates/creator/`, refuses to overwrite any existing creator file, and refuses to create private files inside a surrounding Git repository unless the selected root is ignored. The default `.content-flow/` path is ignored by this repository.
+
+`vault/items/*.md` are canonical, independently readable records. `vault/assets/<item-id>/`
+is optional supporting material, created only when useful material is actually available.
+`vault/index.md` is generated from item frontmatter and is never canonical.
 
 Do not store credentials, API keys, cookies, authentication tokens, or other secrets in creator source files. Source guidance should contain policies and non-secret references only.
 
@@ -43,6 +50,8 @@ The ignored data root does not need to be a Git repository. To version it separa
 ```bash
 cd .content-flow
 git init
+git add vault runs creator
+git commit -m "Capture Content Flow material"
 ```
 
-The parent Content Flow repository continues to ignore `.content-flow/`; the nested repository can use a separate private remote. Content Flow does not create a submodule or initialize this repository automatically.
+The parent Content Flow repository continues to ignore `.content-flow/`; the nested repository can use a separate private remote. Content Flow does not initialize Git, commit, stage files, create a submodule, or perform any other Git write automatically.

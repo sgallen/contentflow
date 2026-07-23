@@ -1,22 +1,30 @@
 # Workflow
 
+## Vault intake and incubation
+
+The vault precedes and outlives runs. Quick capture creates an `inbox` item without forcing
+analysis. Requested enrichment may add source-derived summary/specifics and clearly labeled
+interpretation, proposed angles, and open questions. Selecting one or more items creates a
+normal run, moves selected items to `developing`, records bidirectional IDs, and preserves
+useful material in `spike.md`. See `VAULT.md` for schema and lifecycle.
+
 ## Stage graph
 
 ```text
-selected_idea -> research_decision -> research? -> interview -> draft
-                                                    ^          |
-                                                    |          v
-                                               council <-> revision
-                                                  |  \-> research
-                                                  v
-                                             finalization -> lessons -> complete
+vault item -> selected_idea -> research_decision -> research? -> interview -> draft
+   ^                                                               ^          |
+   |                                                               |          v
+   +--------------------------- park -------------------------- council <-> revision
+                                                                   |  \-> research
+                                                                   v
+                                                              finalization -> lessons -> complete
 ```
 
-Research is conditional. Council findings can route to revision, interview, research, or final human review. Revision normally runs at most twice; unresolved issues then go to the human. Every backward route records its reason in the new or updated artifact and `run.json`.
+Research is conditional. Council findings can route to revision, interview, research, or final human review. Revision normally runs at most twice; unresolved issues then go to the human. Every backward route records its reason in the new or updated artifact and `run.json`. Parking is an explicit non-terminal route from any incomplete stage; it preserves the stage and every artifact.
 
 ## State vocabulary
 
-Valid `stage` values are `selected_idea`, `research_decision`, `research`, `interview`, `draft`, `council`, `revision`, `finalization`, `lessons`, and `complete`. Valid `status` values are `active`, `awaiting_human`, and `complete`.
+Valid `stage` values are `selected_idea`, `research_decision`, `research`, `interview`, `draft`, `council`, `revision`, `finalization`, `lessons`, and `complete`. Valid `status` values are `active`, `awaiting_human`, `parked`, and `complete`.
 
 Valid `pending_human_action` values are:
 
@@ -37,7 +45,7 @@ The usual forward transitions are those in the graph. The only normal backward t
 
 The `artifacts` object always contains these stable current-pointer keys: `spike`, `research`, `interview`, `brief`, `draft`, `council`, `revision_plan`, `revision`, `final`, and `lessons`. Values are run-root filenames or `null`. Semantic filenames are `spike.md`, `research-report.md`, `interview.md`, `content-brief.md`, `draft-NN.md`, `council-NN.md`, `revision-plan-NN.md`, `final.md`, and `lesson-candidates.md`. Preserve older versions under history keys `draft_N`, `council_N`, `revision_plan_N`, or `research_N`, which must point to the matching two-digit filename. Resolved paths must remain inside the run directory.
 
-A valid run begins with this shape (values evolve; fields remain):
+A newly created run begins with this shape (legacy unlinked states may omit vault fields):
 
 ```json
 {
@@ -49,6 +57,12 @@ A valid run begins with this shape (values evolve; fields remain):
   "research_required": null,
   "revision_round": 0,
   "pending_human_action": "provide_idea_details",
+  "origin_vault_items": [],
+  "contributing_vault_items": [],
+  "linked_vault_items": [],
+  "parking_reason": null,
+  "parked_at": null,
+  "final_artifact": null,
   "artifacts": {
     "spike": "spike.md",
     "research": null,
@@ -63,6 +77,13 @@ A valid run begins with this shape (values evolve; fields remain):
   }
 }
 ```
+
+`origin_vault_items` identifies material whose selection directly initiated the run.
+`contributing_vault_items` identifies later or supporting material. `linked_vault_items` is
+their unique ordered union. Legacy states without these keys remain valid as unlinked runs.
+Every linked item reciprocally records the run ID. `parking_reason` and `parked_at` are
+required when status is `parked`; pre-park status/action fields support deterministic
+resume. `final_artifact` records the run-relative final path after vault final-linking.
 
 Use `status: awaiting_human` with a specific pending action, `active` with `pending_human_action: none` while Codex can continue, and `complete` only with the terminal stage. A stage is advanced after its required output artifact is durably written; while a human gate is pending, keep the last valid artifact-backed stage and record the pending action.
 
@@ -81,6 +102,22 @@ For `awaiting_human`, the allowed stage/action combinations are:
 
 `finalization` has no awaiting-human state because explicit approval occurs while the visible candidate remains at `council` or `revision`; after approval, Codex writes `final.md` and advances. `complete` always has `status: complete` and no pending action.
 
+## Explicit parking route
+
+A human may park a run because its idea lacks substance, the interview did not establish a
+distinctive view, more lived experience or evidence is needed, timing is wrong, the angle
+overlaps existing work, or they simply do not want to finish now. Parking is not failure.
+
+Before the mechanical transition, write `parking-assessment-NN.md` in the run with: what
+remains promising, strongest collected material, why work is stopping, what is missing,
+recommended next step, and whether to resume or reconsider from a new angle. Then use
+`bin/cf vault park-run`. If origins exist, update them in place; otherwise create one
+`run-fragment`. Set run status `parked`, pending action `none`, link IDs, reason, and UTC
+timestamp. Preserve the whole run directory.
+
+`bin/cf vault resume-run` restores the pre-park status/gate and sets origins back to
+`developing`. Resume at the preserved stage after reading and validating disk state.
+
 ## Stage 1: Selected idea
 
 ### Entry condition
@@ -89,7 +126,7 @@ A run exists and the human has selected or supplied an idea.
 
 ### Inputs
 
-The supplied idea, title, any source note or vault spike, and the human's initial confidentiality guidance.
+The supplied idea, title, any source note or vault item, and the human's initial confidentiality guidance.
 
 ### Task
 
@@ -306,6 +343,11 @@ The approved draft, selected hook/closing, and remaining caveats.
 ### Task
 
 Create an immutable final copy, count its post body with `bin/cf count final.md --section "Approved post"`, and record selection, caveats, and approval. Do not publish.
+
+After writing and validating the final artifact, preserve all linked items and record the
+final path with `bin/cf vault finalize-run`. Direct origins become `used` unless the human
+chooses otherwise. Supporting contributors are not marked used; developing ones return to
+`ready`. No item is deleted.
 
 ### Output artifact
 

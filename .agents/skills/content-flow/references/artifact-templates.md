@@ -33,3 +33,9 @@ Approved post; selected hook/closing; character count; remaining caveats; explic
 ## `lesson-candidates.md`
 
 At most five numbered candidates, each with observed edit/feedback, generalized lesson, applies where, does not apply where, confidence, and approval status (`pending` initially).
+
+## `parking-assessment-NN.md`
+
+Run ID/date; what remains promising; strongest material collected; why the run is not being
+completed; what is missing; recommended next step; recommendation to resume or reconsider
+from a new angle. This is a preservation assessment, not a failure score.

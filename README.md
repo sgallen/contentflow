@@ -20,7 +20,7 @@ The default private root is `<repository>/.content-flow`:
 bin/cf init
 ```
 
-Initialization reports the exact absolute root and confirms Git-ignore status. It copies blank tracked starters from `templates/creator/`, creates `vault/spikes/` and `runs/`, and never overwrites existing creator files.
+Initialization reports the exact absolute root and confirms Git-ignore status. It copies blank tracked starters from `templates/creator/`, creates `vault/items/`, `vault/assets/`, generated `vault/index.md`, and `runs/`, and never overwrites existing creator files.
 
 Select another private root either per command or through the environment:
 
@@ -33,10 +33,45 @@ Do not put credentials or authentication tokens in creator source guidance. The 
 
 To personalize the initialized files later, invoke `$content-flow-setup`. That skill reports every private path before it changes anything. Files under `templates/creator/` are never active configuration.
 
+## Capture material without starting a run
+
+Quick capture records only supplied material, its reason, known metadata, and an `inbox`
+timestamp:
+
+```bash
+bin/cf vault capture \
+  --kind source \
+  --title "A useful fictional article" \
+  --url "https://example.com/fictional-article" \
+  --note "Its distinction between activity and progress may be useful later"
+```
+
+Use `--material` instead of or in addition to `--url` for a quote, observation, transcript
+excerpt, or rough idea. Repeat `--tag` as needed. Supported kinds are `source`, `idea`,
+`observation`, `quote`, `excerpt`, and `run-fragment`.
+
+An enriched capture starts from the same scaffold, then the Content Flow skill may add a
+concise summary, source-supported specifics, proposed angles, and open questions. It labels
+source-derived information separately from interpretation and does not manufacture the
+creator's view. Enrichment is optional.
+
+```bash
+bin/cf vault list --status parked --tag leadership
+bin/cf vault show <item-id>
+bin/cf vault update <item-id> --status ready --revisit-after 2026-09-01
+bin/cf vault rebuild-index
+bin/cf vault validate
+```
+
+`vault/index.md` is a deterministic grouped view, not source of truth. Item age never
+changes status automatically.
+
 ## Start a run
 
 ```bash
 bin/cf new-run --title "Why small teams need decision logs" --format linkedin
+bin/cf new-run --vault-item <item-id>
+bin/cf new-run --vault-item <origin-id> --contributing-vault-item <source-id>
 ```
 
 The command reports the active data root and absolute run path. A first-run prompt can be:
@@ -51,6 +86,25 @@ Guide me through the workflow one human gate at a time. Do not invent my point o
 
 Real spikes and runs are written only under the active private root. `examples/` remains fictional and tracked.
 
+Selecting a vault item changes it to `developing`, links both sides, and preserves item
+provenance in `spike.md`. Multiple items may contribute to one run.
+
+## Park, resume, and complete linked work
+
+`$content-flow` prepares a written parking assessment before using the mechanical route:
+
+```bash
+bin/cf vault park-run <run-id> --reason "Needs a lived example" \
+  --assessment-file <run-path>/parking-assessment-01.md
+bin/cf vault resume-run <run-id>
+```
+
+Parking preserves the entire run. An originating item is updated rather than duplicated;
+an unlinked run creates one `run-fragment`. When a final artifact exists,
+`bin/cf vault finalize-run <run-id>` records it and marks direct origins `used` unless the
+human chooses `--keep-origin-status`. Contributing sources are not automatically marked
+used; developing contributors return to `ready`.
+
 ## Resume or inspect
 
 ```bash
@@ -62,6 +116,14 @@ A bare run ID resolves under `<data-root>/runs/`. An explicit absolute or multi-
 
 Use `--data-dir <path>` on `new-run`, `status`, or `validate`, or set `CONTENT_FLOW_HOME`, to select the same non-default root.
 
+## Vault lifecycle
+
+`inbox` is captured but unreviewed; `ready` is understood enough to consider;
+`developing` has an active run; `parked` retains useful incomplete development; `used`
+contributed directly to final content; and `archived` is intentionally out of active
+consideration. Supported transitions are documented in `VAULT.md`. Nothing ages into
+`archived`, and used or archived files are retained.
+
 ## Tests and utilities
 
 ```bash
@@ -72,3 +134,12 @@ bin/cf count examples/completed-run/final.md --section "Approved post"
 ```
 
 See `WORKFLOW.md` for stage contracts, `ARCHITECTURE.md` for design boundaries, and `ACCEPTANCE.md` for verifiable completion criteria.
+
+The private root may be its own Git repository. Content Flow works without Git and never
+commits automatically. A normal manual snapshot is:
+
+```bash
+cd .content-flow
+git add vault runs creator
+git commit -m "Capture Content Flow material"
+```

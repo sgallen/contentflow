@@ -5,7 +5,7 @@ Run commands from the repository root.
 ## Public/private boundary
 
 - [ ] The tracked repository contains reusable skills, tooling, documentation, tests, blank templates, and fictional examples only.
-- [ ] `templates/creator/` contains every required starter; no tracked `creator/`, `vault/`, or `runs/` directory acts as live data.
+- [ ] `templates/creator/` contains every required starter; tracked vault files are blank or explicitly fictional, and no tracked `creator/`, `vault/`, or `runs/` directory acts as live data.
 - [ ] `.content-flow/` is ignored and `bin/cf init` confirms Git safety before writing private files.
 - [ ] `DATA_ROOT.md` defines CLI option, environment, and default precedence once; other files reference it.
 - [ ] No automatic path copies private work into `examples/`, and creator source guidance warns against secrets.
@@ -16,6 +16,7 @@ Run commands from the repository root.
 - [ ] Setup reports intended private creator paths and never modifies templates.
 - [ ] Orchestration reports the root, fails clearly before private setup, and stores real vault/run artifacts only under it.
 - [ ] Research remains conditional; interview, Council, revision, finalization, and lessons retain human gates.
+- [ ] Natural-language quick/enriched capture, vault selection, parking, resume, and linked finalization preserve their documented gates and provenance.
 
 Verify skills:
 
@@ -26,18 +27,27 @@ python3 /home/barney/.codex/skills/.system/skill-creator/scripts/quick_validate.
 
 ## CLI and state
 
-- [ ] `bin/cf init` creates creator files, `vault/spikes/`, and `runs/` without overwriting.
+- [ ] `bin/cf init` creates creator files, `vault/items/`, `vault/assets/`, generated `vault/index.md`, and `runs/` without overwriting.
 - [ ] `--data-dir`, `CONTENT_FLOW_HOME`, and the repository-local default follow documented precedence.
 - [ ] Bare run IDs resolve under the active root's `runs/`; explicit paths remain supported.
 - [ ] `status` reports the active root and run state.
 - [ ] `validate` retains enum, gate, revision, filename, presence, and path/symlink checks.
 - [ ] `count` remains deterministic and offline.
+- [ ] Vault capture/show/list/update/rebuild/validate work under every data-root selector.
+- [ ] One or more vault items can start a run; run and item state link bidirectionally.
+- [ ] Parking updates origins or creates one run-fragment, resume restores state, and final linkage marks only direct origins used by default.
+- [ ] Validation detects malformed items, duplicate IDs/relations, unsafe paths, stale index, missing required relationships, developing-without-active-run, and invalid parked state.
 
 ## Verification
 
 ```bash
 python3 -m unittest discover -s tests -v
 bin/cf init
+bin/cf vault capture --kind idea --title "Example vault idea" --note "Fictional verification item"
+bin/cf vault list
+bin/cf vault show <created-item-id>
+bin/cf vault rebuild-index
+bin/cf vault validate
 bin/cf validate examples/completed-run
 bin/cf status examples/completed-run
 bin/cf --help
