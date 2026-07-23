@@ -1,6 +1,6 @@
 # Lesson candidates
 
-These proposals are pending and have **not** changed `creator/lessons.md`.
+These proposals have **not** changed `creator/lessons.md`. On 2026-07-12, the fictional human completed the lesson gate without approving any candidate; the proposals remain evidence of learning considered but not accepted as persistent guidance.
 
 ## 1. Prefer the creator's mechanism over business abstractions
 
@@ -9,7 +9,7 @@ These proposals are pending and have **not** changed `creator/lessons.md`.
 - **Apply where:** Explanatory posts grounded in firsthand experience.
 - **Do not apply where:** A term of art is required and precisely supported.
 - **Confidence:** High.
-- **Approval:** Pending.
+- **Approval:** Not approved on 2026-07-12.
 
 ## 2. Pair a practice with a stop rule
 
@@ -18,7 +18,7 @@ These proposals are pending and have **not** changed `creator/lessons.md`.
 - **Apply where:** Experiments and lightweight process advice.
 - **Do not apply where:** Safety, legal, or irreversible actions need formal controls.
 - **Confidence:** Medium.
-- **Approval:** Pending.
+- **Approval:** Not approved on 2026-07-12.
 
 ## 3. Bound anecdotal claims explicitly
 
@@ -27,5 +27,4 @@ These proposals are pending and have **not** changed `creator/lessons.md`.
 - **Apply where:** Personal or team anecdotes.
 - **Do not apply where:** Stronger representative evidence genuinely supports broader inference.
 - **Confidence:** High.
-- **Approval:** Pending.
-
+- **Approval:** Not approved on 2026-07-12.

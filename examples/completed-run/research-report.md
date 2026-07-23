@@ -15,6 +15,10 @@ Completed 2026-07-10 against a **fictional local source packet** for this exampl
 - “The log saved a week” is a participant estimate, not measured elapsed time.
 - One engineer attributed improvement partly to a smaller meeting group.
 
+## Unresolved claims
+
+- None blocking. The numerical time estimate remains disputed and is excluded from the post.
+
 ## Interpretation
 
 The packet supports a bounded claim that recoverable reasoning reduced repeated discussion for this team. It does not prove that decision logs universally increase delivery speed.
@@ -25,4 +29,3 @@ The packet supports a bounded claim that recoverable reasoning reduced repeated 
 - Why did the log work when ordinary meeting notes did not?
 - What is the strongest bureaucracy objection?
 - What should a reader try next week?
-

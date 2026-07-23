@@ -67,6 +67,7 @@ Natural requests such as “run the council,” “apply the pending plan,” �
 python3 -m unittest discover -s tests -v
 bin/cf validate examples/completed-run
 bin/cf count examples/completed-run/final.md
+bin/cf count examples/completed-run/final.md --section "Approved post"
 ```
 
 See `WORKFLOW.md` for the stage graph, `ARCHITECTURE.md` for design boundaries, and `ACCEPTANCE.md` for verifiable completion criteria.

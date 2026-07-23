@@ -5,6 +5,7 @@
   "stage": "complete",
   "status": "complete",
   "research_required": true,
+  "revision_round": 1,
   "pending_human_action": "none",
   "artifacts": {
     "spike": "spike.md",
@@ -13,10 +14,10 @@
     "brief": "content-brief.md",
     "draft": "draft-02.md",
     "draft_1": "draft-01.md",
-    "council": "council-01.md",
+    "council": "council-02.md",
+    "council_1": "council-01.md",
     "revision_plan": "revision-plan-01.md",
     "revision": "draft-02.md",
-    "council_2": "council-02.md",
     "final": "final.md",
     "lessons": "lesson-candidates.md"
   }

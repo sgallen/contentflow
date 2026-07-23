@@ -1,6 +1,10 @@
 # Writer's Council 02
 
-Re-score requested by the human. Same 0–100 diagnostic scale and 75 threshold.
+Same 0–100 diagnostic scale and 75 threshold.
+
+## Authorization record
+
+The fictional human explicitly requested this re-score on 2026-07-12 after reviewing Draft 02.
 
 ## What is working
 
@@ -35,4 +39,3 @@ None.
 ## Recommended route
 
 `ready for final human review`
-

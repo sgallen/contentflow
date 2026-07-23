@@ -13,7 +13,15 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from content_flow.cli import load_state, main, make_run, resolve_run, slugify, validation_errors
+from content_flow.cli import (
+    extract_markdown_section,
+    load_state,
+    main,
+    make_run,
+    resolve_run,
+    slugify,
+    validation_errors,
+)
 
 
 class ContentFlowCLITests(unittest.TestCase):
@@ -33,6 +41,7 @@ class ContentFlowCLITests(unittest.TestCase):
         self.assertEqual(run.name, "2026-07-22-decision-logs")
         state = load_state(run)
         self.assertEqual(state["pending_human_action"], "provide_idea_details")
+        self.assertEqual(state["revision_round"], 0)
         self.assertEqual(validation_errors(run, state), [])
         self.assertTrue((run / "spike.md").is_file())
 
@@ -68,6 +77,118 @@ class ContentFlowCLITests(unittest.TestCase):
         state["artifacts"]["extra"] = "../secret.md"
         self.assertIn("artifact 'extra' must stay inside the run directory", validation_errors(run, state))
 
+    def test_validate_rejects_symlink_artifact_escape(self) -> None:
+        run = make_run(self.root, "Symlink", "linkedin", date(2026, 7, 22))
+        outside = self.root / "outside.md"
+        outside.write_text("secret", encoding="utf-8")
+        (run / "draft-01.md").symlink_to(outside)
+        state = load_state(run)
+        state["artifacts"]["draft"] = "draft-01.md"
+        self.assertIn(
+            "artifact 'draft' must resolve inside the run directory",
+            validation_errors(run, state),
+        )
+
+    def test_validate_rejects_stage_action_mismatch(self) -> None:
+        run = make_run(self.root, "Wrong gate", "linkedin", date(2026, 7, 22))
+        state = load_state(run)
+        state["pending_human_action"] = "approve_final"
+        self.assertIn(
+            "stage 'selected_idea' cannot await 'approve_final'; allowed actions: provide_idea_details",
+            validation_errors(run, state),
+        )
+
+    def test_validate_rejects_non_boolean_research_decision(self) -> None:
+        run = make_run(self.root, "Wrong type", "linkedin", date(2026, 7, 22))
+        state = load_state(run)
+        state["research_required"] = 0
+        self.assertIn("research_required must be null or a Boolean", validation_errors(run, state))
+
+    def test_validate_requires_stable_artifact_keys(self) -> None:
+        run = make_run(self.root, "Missing key", "linkedin", date(2026, 7, 22))
+        state = load_state(run)
+        del state["artifacts"]["lessons"]
+        self.assertIn("missing stable artifact key: lessons", validation_errors(run, state))
+
+    def test_validate_rejects_semantically_wrong_artifact_filename(self) -> None:
+        run = make_run(self.root, "Wrong file", "linkedin", date(2026, 7, 22))
+        state = load_state(run)
+        state["artifacts"]["research"] = "notes.md"
+        (run / "notes.md").write_text("notes", encoding="utf-8")
+        self.assertIn(
+            "artifact 'research' has invalid filename: notes.md",
+            validation_errors(run, state),
+        )
+
+    def test_validate_enforces_cumulative_council_artifacts(self) -> None:
+        run = make_run(self.root, "Council history", "linkedin", date(2026, 7, 22))
+        state = load_state(run)
+        state.update(
+            stage="council",
+            status="awaiting_human",
+            research_required=False,
+            pending_human_action="approve_final",
+        )
+        for key, filename in {
+            "brief": "content-brief.md",
+            "draft": "draft-01.md",
+            "council": "council-01.md",
+        }.items():
+            state["artifacts"][key] = filename
+            (run / filename).write_text(key, encoding="utf-8")
+        self.assertIn("stage 'council' requires artifact 'interview'", validation_errors(run, state))
+
+    def test_validate_enforces_revision_round_and_current_pointer(self) -> None:
+        run = make_run(self.root, "Revision pointer", "linkedin", date(2026, 7, 22))
+        state = load_state(run)
+        state["revision_round"] = 1
+        self.assertIn(
+            "revision_round greater than 0 requires artifact 'revision'",
+            validation_errors(run, state),
+        )
+
+    def test_validate_rejects_stale_current_artifact_pointer(self) -> None:
+        run = make_run(self.root, "Stale pointer", "linkedin", date(2026, 7, 22))
+        state = load_state(run)
+        state["artifacts"].update(council="council-01.md", council_2="council-02.md")
+        (run / "council-01.md").write_text("first", encoding="utf-8")
+        (run / "council-02.md").write_text("second", encoding="utf-8")
+        self.assertIn(
+            "current artifact 'council' is older than its recorded history",
+            validation_errors(run, state),
+        )
+
+    def test_validate_rejects_third_revision_plan(self) -> None:
+        run = make_run(self.root, "Revision cap", "linkedin", date(2026, 7, 22))
+        state = load_state(run)
+        state.update(
+            stage="revision",
+            status="awaiting_human",
+            research_required=False,
+            revision_round=2,
+            pending_human_action="approve_revision_plan",
+        )
+        state["artifacts"].update(
+            interview="interview.md",
+            brief="content-brief.md",
+            draft="draft-03.md",
+            council="council-02.md",
+            revision_plan="revision-plan-02.md",
+            revision="draft-03.md",
+        )
+        for filename in (
+            "interview.md",
+            "content-brief.md",
+            "draft-03.md",
+            "council-02.md",
+            "revision-plan-02.md",
+        ):
+            (run / filename).write_text(filename, encoding="utf-8")
+        self.assertIn(
+            "revision_round=2 cannot await another revision plan; resolve the revision limit",
+            validation_errors(run, state),
+        )
+
     def test_validate_enforces_research_artifact(self) -> None:
         run = make_run(self.root, "Research", "linkedin", date(2026, 7, 22))
         state = load_state(run)
@@ -90,6 +211,16 @@ class ContentFlowCLITests(unittest.TestCase):
             result = main(["count", str(path)], root=self.root)
         self.assertEqual(result, 0)
         self.assertEqual(output.getvalue(), "4\n")
+
+    def test_count_can_select_exact_markdown_section(self) -> None:
+        path = self.root / "post.md"
+        path.write_text("# Draft\n\n## Post\n\nA🙂é\n\n## Notes\n\nIgnore\n", encoding="utf-8")
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            result = main(["count", str(path), "--section", "Post"], root=self.root)
+        self.assertEqual(result, 0)
+        self.assertEqual(output.getvalue(), "3\n")
+        self.assertEqual(extract_markdown_section(path.read_text(encoding="utf-8"), "Post"), "A🙂é")
 
     def test_validate_command_returns_nonzero_for_invalid_json_state(self) -> None:
         run = make_run(self.root, "Invalid", "linkedin", date(2026, 7, 22))

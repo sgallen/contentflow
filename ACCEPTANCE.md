@@ -22,9 +22,9 @@ python3 /home/barney/.codex/skills/.system/skill-creator/scripts/quick_validate.
 
 - [ ] `bin/cf new-run --title "Acceptance smoke" --format linkedin` creates `runs/<date>-acceptance-smoke` and never overwrites a collision.
 - [ ] The created run contains `run.json` and `spike.md` and passes validation.
-- [ ] `status` reports stage, status, research decision, pending action, and artifacts.
-- [ ] `validate` rejects invalid enums, state/action inconsistency, unsafe paths, missing files, and missing stage artifacts.
-- [ ] `count` reports Unicode code points without network access.
+- [ ] `status` reports stage, status, research decision, revision round, pending action, and artifact filenames.
+- [ ] `validate` rejects invalid enums, stage/action inconsistency, revision-limit violations, unsafe paths (including symlinks), missing files, bad artifact names, and missing stage artifacts.
+- [ ] `count` reports Unicode code points for a whole file or one exact Markdown section without network access.
 
 Automated verification:
 
@@ -41,4 +41,3 @@ bin/cf validate examples/completed-run
 - [ ] A repository search finds no implementation of OpenClaw, connectors, OpenAI API calls, LangGraph, Temporal, vector databases, a web UI, background work, autonomous publishing, or multi-agent infrastructure.
 - [ ] `creator/lessons.md` does not contain unapproved example lessons.
 - [ ] `ARCHITECTURE.md` explains procedure/state/artifacts, context scopes, responsibility boundaries, framework avoidance, and portability.
-

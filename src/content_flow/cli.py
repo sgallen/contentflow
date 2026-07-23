@@ -35,6 +35,8 @@ PENDING_ACTIONS = (
     "resolve_revision_limit",
     "approve_final",
     "approve_lessons",
+    "confirm_route",
+    "resolve_research_scope",
     "none",
 )
 REQUIRED_FIELDS = (
@@ -44,8 +46,21 @@ REQUIRED_FIELDS = (
     "stage",
     "status",
     "research_required",
+    "revision_round",
     "pending_human_action",
     "artifacts",
+)
+ARTIFACT_KEYS = (
+    "spike",
+    "research",
+    "interview",
+    "brief",
+    "draft",
+    "council",
+    "revision_plan",
+    "revision",
+    "final",
+    "lessons",
 )
 STAGE_ARTIFACTS = {
     "selected_idea": ("spike",),
@@ -53,11 +68,41 @@ STAGE_ARTIFACTS = {
     "research": ("spike", "research"),
     "interview": ("spike", "interview"),
     "draft": ("spike", "interview", "brief", "draft"),
-    "council": ("spike", "brief", "draft", "council"),
-    "revision": ("spike", "draft", "council", "revision_plan"),
-    "finalization": ("spike", "draft", "final"),
-    "lessons": ("spike", "draft", "final", "lessons"),
-    "complete": ("spike", "draft", "final", "lessons"),
+    "council": ("spike", "interview", "brief", "draft", "council"),
+    "revision": ("spike", "interview", "brief", "draft", "council", "revision_plan"),
+    "finalization": ("spike", "interview", "brief", "draft", "council", "final"),
+    "lessons": ("spike", "interview", "brief", "draft", "council", "final", "lessons"),
+    "complete": ("spike", "interview", "brief", "draft", "council", "final", "lessons"),
+}
+ALLOWED_AWAITING_ACTIONS = {
+    "selected_idea": {"provide_idea_details"},
+    "research_decision": {"confirm_research_decision"},
+    "research": {"resolve_research_scope"},
+    "interview": {"answer_interview_question"},
+    "draft": {"review_draft", "authorize_council"},
+    "council": {"confirm_route", "approve_final"},
+    "revision": {
+        "approve_revision_plan",
+        "resolve_revision_limit",
+        "review_draft",
+        "authorize_council",
+        "approve_final",
+    },
+    "finalization": set(),
+    "lessons": {"approve_lessons"},
+    "complete": set(),
+}
+ARTIFACT_NAME_PATTERNS = {
+    "spike": re.compile(r"spike\.md"),
+    "research": re.compile(r"research-report(?:-\d{2})?\.md"),
+    "interview": re.compile(r"interview\.md"),
+    "brief": re.compile(r"content-brief\.md"),
+    "draft": re.compile(r"draft-\d{2}\.md"),
+    "council": re.compile(r"council-\d{2}\.md"),
+    "revision_plan": re.compile(r"revision-plan-\d{2}\.md"),
+    "revision": re.compile(r"draft-\d{2}\.md"),
+    "final": re.compile(r"final\.md"),
+    "lessons": re.compile(r"lesson-candidates\.md"),
 }
 DEFAULT_ARTIFACTS = {
     "spike": "spike.md",
@@ -68,7 +113,6 @@ DEFAULT_ARTIFACTS = {
     "council": None,
     "revision_plan": None,
     "revision": None,
-    "council_2": None,
     "final": None,
     "lessons": None,
 }
@@ -107,6 +151,7 @@ def make_run(root: Path, title: str, format_name: str, today: date | None = None
         "stage": "selected_idea",
         "status": "awaiting_human",
         "research_required": None,
+        "revision_round": 0,
         "pending_human_action": "provide_idea_details",
         "artifacts": dict(DEFAULT_ARTIFACTS),
     }
@@ -155,6 +200,7 @@ def validation_errors(run_dir: Path, state: dict[str, Any]) -> list[str]:
     status = state.get("status")
     action = state.get("pending_human_action")
     research_required = state.get("research_required")
+    revision_round = state.get("revision_round")
     artifacts = state.get("artifacts")
 
     if state.get("id") != run_dir.name:
@@ -169,8 +215,10 @@ def validation_errors(run_dir: Path, state: dict[str, Any]) -> list[str]:
         errors.append(f"status must be one of: {', '.join(STATUSES)}")
     if action not in PENDING_ACTIONS:
         errors.append(f"pending_human_action must be one of: {', '.join(PENDING_ACTIONS)}")
-    if research_required not in (None, True, False):
+    if research_required is not None and not isinstance(research_required, bool):
         errors.append("research_required must be null or a Boolean")
+    if isinstance(revision_round, bool) or not isinstance(revision_round, int) or not 0 <= revision_round <= 2:
+        errors.append("revision_round must be an integer from 0 to 2")
     if stage in STAGES[2:] and research_required is None:
         errors.append("research_required must be decided by the research stage")
     if stage == "research" and research_required is not True:
@@ -183,10 +231,21 @@ def validation_errors(run_dir: Path, state: dict[str, Any]) -> list[str]:
         errors.append("complete stage requires complete status and no pending action")
     if status == "complete" and stage != "complete":
         errors.append("complete status requires stage='complete'")
+    if status == "awaiting_human" and stage in ALLOWED_AWAITING_ACTIONS:
+        allowed = ALLOWED_AWAITING_ACTIONS[stage]
+        if action not in allowed:
+            choices = ", ".join(sorted(allowed)) or "none"
+            errors.append(f"stage '{stage}' cannot await '{action}'; allowed actions: {choices}")
+    if stage == "revision" and action == "approve_revision_plan" and revision_round == 2:
+        errors.append("revision_round=2 cannot await another revision plan; resolve the revision limit")
 
     if not isinstance(artifacts, dict):
         errors.append("artifacts must be a JSON object")
         return errors
+
+    for key in ARTIFACT_KEYS:
+        if key not in artifacts:
+            errors.append(f"missing stable artifact key: {key}")
 
     for key, value in artifacts.items():
         if value is None:
@@ -198,7 +257,34 @@ def validation_errors(run_dir: Path, state: dict[str, Any]) -> list[str]:
         if path.is_absolute() or ".." in path.parts:
             errors.append(f"artifact '{key}' must stay inside the run directory")
             continue
-        if not (run_dir / path).is_file():
+        artifact_path = run_dir / path
+        try:
+            artifact_path.resolve().relative_to(run_dir.resolve())
+        except ValueError:
+            errors.append(f"artifact '{key}' must resolve inside the run directory")
+            continue
+        pattern = ARTIFACT_NAME_PATTERNS.get(key)
+        if pattern is None:
+            family = re.fullmatch(r"(draft|council|revision_plan|research)_\d+", key)
+            if family:
+                family_key = family.group(1)
+                pattern = ARTIFACT_NAME_PATTERNS[family_key]
+                version = int(key.rsplit("_", 1)[1])
+                prefix = "revision-plan" if family_key == "revision_plan" else (
+                    "research-report" if family_key == "research" else family_key
+                )
+                expected_name = f"{prefix}-{version:02d}.md"
+                if path.name != expected_name:
+                    errors.append(
+                        f"versioned artifact '{key}' must point to '{expected_name}', not '{value}'"
+                    )
+            else:
+                errors.append(f"unknown artifact key: {key}")
+        if pattern is not None and not pattern.fullmatch(path.name):
+            errors.append(f"artifact '{key}' has invalid filename: {value}")
+        if len(path.parts) != 1:
+            errors.append(f"artifact '{key}' must be a filename at the run root")
+        if not artifact_path.is_file():
             errors.append(f"artifact '{key}' points to missing file: {value}")
 
     if stage in STAGE_ARTIFACTS:
@@ -208,6 +294,46 @@ def validation_errors(run_dir: Path, state: dict[str, Any]) -> list[str]:
                 errors.append(f"stage '{stage}' requires artifact '{key}'")
     if research_required is True and stage in STAGES[3:] and not artifacts.get("research"):
         errors.append("research_required=true requires a research artifact after research stage")
+    revision = artifacts.get("revision")
+    if revision_round == 0 and revision:
+        errors.append("revision_round=0 requires artifact 'revision' to be null")
+    if revision_round == 0 and artifacts.get("draft") and artifacts.get("draft") != "draft-01.md":
+        errors.append("revision_round=0 requires current artifact 'draft' to be 'draft-01.md'")
+    if isinstance(revision_round, int) and not isinstance(revision_round, bool) and revision_round > 0:
+        if not revision:
+            errors.append("revision_round greater than 0 requires artifact 'revision'")
+        elif artifacts.get("draft") != revision:
+            errors.append("current 'draft' must match 'revision' after an applied revision")
+        elif revision != f"draft-{revision_round + 1:02d}.md":
+            errors.append("artifact 'revision' filename must match revision_round")
+
+    for family, current_key in (
+        ("draft", "draft"),
+        ("council", "council"),
+        ("revision_plan", "revision_plan"),
+        ("research", "research"),
+    ):
+        history_versions = [
+            int(key.rsplit("_", 1)[1])
+            for key in artifacts
+            if re.fullmatch(fr"{family}_\d+", key)
+        ]
+        current_value = artifacts.get(current_key)
+        if history_versions and not current_value:
+            errors.append(f"artifact history for '{current_key}' requires a current pointer")
+        if history_versions and current_value:
+            current_match = re.search(r"-(\d{2})\.md$", current_value)
+            current_version = int(current_match.group(1)) if current_match else 0
+            if current_version < max(history_versions):
+                errors.append(f"current artifact '{current_key}' is older than its recorded history")
+        versions = list(history_versions)
+        if current_value:
+            current_match = re.search(r"-(\d{2})\.md$", current_value)
+            if current_match:
+                versions.append(int(current_match.group(1)))
+        maximum = 3 if family == "draft" else 2 if family == "revision_plan" else None
+        if maximum is not None and any(version > maximum for version in versions):
+            errors.append(f"artifact family '{family}' exceeds its maximum version {maximum:02d}")
     return errors
 
 
@@ -232,8 +358,9 @@ def cmd_status(args: argparse.Namespace, root: Path) -> int:
     print(f"stage: {state.get('stage', '<invalid>')}")
     print(f"status: {state.get('status', '<invalid>')}")
     print(f"research_required: {json.dumps(state.get('research_required'))}")
+    print(f"revision_round: {state.get('revision_round', '<invalid>')}")
     print(f"pending_human_action: {state.get('pending_human_action', '<invalid>')}")
-    existing = [key for key, value in state.get("artifacts", {}).items() if value]
+    existing = [f"{key}={value}" for key, value in state.get("artifacts", {}).items() if value]
     print(f"artifacts: {', '.join(existing) if existing else 'none'}")
     errors = validation_errors(run_dir, state)
     print(f"validation: {'ok' if not errors else f'{len(errors)} error(s)'}")
@@ -262,8 +389,32 @@ def cmd_count(args: argparse.Namespace, root: Path) -> int:
         content = path.read_text(encoding="utf-8")
     except UnicodeDecodeError as exc:
         raise CFError(f"file is not valid UTF-8: {path}") from exc
+    if args.section:
+        content = extract_markdown_section(content, args.section)
     print(len(content))
     return 0
+
+
+def extract_markdown_section(content: str, title: str) -> str:
+    """Return one named Markdown section without its heading or outer blank lines."""
+    matches: list[tuple[int, int]] = []
+    lines = content.splitlines(keepends=True)
+    for index, line in enumerate(lines):
+        match = re.match(r"^(#{1,6})\s+(.+?)\s*#*\s*(?:\r?\n)?$", line)
+        if match and match.group(2).strip() == title:
+            matches.append((index, len(match.group(1))))
+    if not matches:
+        raise CFError(f"Markdown section not found: {title}")
+    if len(matches) > 1:
+        raise CFError(f"Markdown section is ambiguous: {title}")
+    start, level = matches[0]
+    end = len(lines)
+    for index in range(start + 1, len(lines)):
+        match = re.match(r"^(#{1,6})\s+", lines[index])
+        if match and len(match.group(1)) <= level:
+            end = index
+            break
+    return "".join(lines[start + 1 : end]).strip("\r\n")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -285,6 +436,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     count = subparsers.add_parser("count", help="count Unicode code points in a UTF-8 file")
     count.add_argument("file")
+    count.add_argument("--section", help="count only the body of one exact Markdown heading")
     count.set_defaults(handler=cmd_count)
     return parser
 

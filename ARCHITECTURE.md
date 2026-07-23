@@ -2,7 +2,7 @@
 
 ## Procedure, state, and artifacts
 
-The **procedure** lives in `AGENTS.md`, `WORKFLOW.md`, and the two repository skills. It tells Codex how to reason and where humans must decide. **State** is the small `run.json` cursor in each run. It records the current stage, status, pending human action, research decision, and artifact paths. **Artifacts** are named Markdown evidence of what happened: spike, research, interview, brief, drafts, reviews, final, and lesson candidates.
+The **procedure** lives in `AGENTS.md`, `WORKFLOW.md`, and the two repository skills. It tells Codex how to reason and where humans must decide. **State** is the small `run.json` cursor in each run. It records the current stage, status, pending human action, research decision, revision round, and current/history artifact paths. **Artifacts** are named Markdown evidence of what happened: spike, research, interview, brief, drafts, reviews, final, and lesson candidates.
 
 `run.json` aids resumption; it is not a workflow engine. An artifact holds substance while state points to it. Git versions both.
 
@@ -43,4 +43,3 @@ The pattern generalizes to proposals, talks, decision memos, or case studies by 
 5. human gates for taste, responsibility, and learning.
 
 Because skills are Markdown, assets are ordinary files, and tooling is Python standard library, the workflow can later be repackaged for another skill/plugin system without coupling domain logic to an API or server.
-

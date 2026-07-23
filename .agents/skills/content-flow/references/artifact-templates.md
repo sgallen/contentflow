@@ -12,7 +12,7 @@ Scope/date; Verified facts (claim + source); Disputed claims; Interpretation (cl
 
 ## `interview.md` and `content-brief.md`
 
-For each exchange: question, functional lens, human answer, obtained, missing, next move. Brief: thesis, audience, concrete example, causal detail, tension/objection, payoff/implication, evidence, boundaries, open risks.
+Before asking: question, functional lens, material already obtained, missing coverage targeted, and `Answer: pending`. After the response: replace the marker with the human answer and record obtained, missing, and next move. Brief: thesis, audience, concrete example, causal detail, tension/objection, payoff/implication, evidence, boundaries, open risks.
 
 ## `draft-NN.md`
 
@@ -20,7 +20,7 @@ Three hook options; main body; three closing options; recommended assembled vers
 
 ## `council-NN.md`
 
-What works; blocking findings; consensus (name at least two supporting lenses); six lens observations and scores; overall diagnostic score and scale; ranked revision plan; exactly one recommended route.
+Human authorization/request record; what works; blocking findings; consensus (name at least two supporting lenses); six lens observations and scores; overall diagnostic score and scale; ranked revision plan; exactly one recommended route.
 
 ## `revision-plan-NN.md`
 
@@ -33,4 +33,3 @@ Approved post; selected hook/closing; character count; remaining caveats; explic
 ## `lesson-candidates.md`
 
 At most five numbered candidates, each with observed edit/feedback, generalized lesson, applies where, does not apply where, confidence, and approval status (`pending` initially).
-

@@ -29,11 +29,13 @@ Valid `pending_human_action` values are:
 - `resolve_revision_limit`
 - `approve_final`
 - `approve_lessons`
+- `confirm_route`
+- `resolve_research_scope`
 - `none`
 
-The usual forward transitions are those in the graph. The only normal backward transitions are `draft|council|revision -> interview` and `draft|council|revision -> research`. `complete` is terminal unless the human explicitly reopens the run. `research_required` is `null` before a decision and a Boolean afterward.
+The usual forward transitions are those in the graph. The only normal backward transitions are `draft|council|revision -> interview` and `draft|council|revision -> research`. `complete` is terminal unless the human explicitly reopens the run. `research_required` is `null` before a decision and a Boolean afterward. `revision_round` starts at `0`, increments only after an approved plan is applied, and may not exceed `2`.
 
-The `artifacts` object uses these stable keys when applicable: `spike`, `research`, `interview`, `brief`, `draft`, `council`, `revision_plan`, `revision`, `council_2`, `final`, and `lessons`. Values are run-relative filenames or `null`. Additional versioned keys are allowed. Paths must remain inside the run directory.
+The `artifacts` object always contains these stable current-pointer keys: `spike`, `research`, `interview`, `brief`, `draft`, `council`, `revision_plan`, `revision`, `final`, and `lessons`. Values are run-root filenames or `null`. Semantic filenames are `spike.md`, `research-report.md`, `interview.md`, `content-brief.md`, `draft-NN.md`, `council-NN.md`, `revision-plan-NN.md`, `final.md`, and `lesson-candidates.md`. Preserve older versions under history keys `draft_N`, `council_N`, `revision_plan_N`, or `research_N`, which must point to the matching two-digit filename. Resolved paths must remain inside the run directory.
 
 A valid run begins with this shape (values evolve; fields remain):
 
@@ -45,6 +47,7 @@ A valid run begins with this shape (values evolve; fields remain):
   "stage": "selected_idea",
   "status": "awaiting_human",
   "research_required": null,
+  "revision_round": 0,
   "pending_human_action": "provide_idea_details",
   "artifacts": {
     "spike": "spike.md",
@@ -55,7 +58,6 @@ A valid run begins with this shape (values evolve; fields remain):
     "council": null,
     "revision_plan": null,
     "revision": null,
-    "council_2": null,
     "final": null,
     "lessons": null
   }
@@ -63,6 +65,21 @@ A valid run begins with this shape (values evolve; fields remain):
 ```
 
 Use `status: awaiting_human` with a specific pending action, `active` with `pending_human_action: none` while Codex can continue, and `complete` only with the terminal stage. A stage is advanced after its required output artifact is durably written; while a human gate is pending, keep the last valid artifact-backed stage and record the pending action.
+
+For `awaiting_human`, the allowed stage/action combinations are:
+
+| Stage | Allowed pending action |
+| --- | --- |
+| `selected_idea` | `provide_idea_details` |
+| `research_decision` | `confirm_research_decision` |
+| `research` | `resolve_research_scope` |
+| `interview` | `answer_interview_question` |
+| `draft` | `review_draft`, `authorize_council` |
+| `council` | `confirm_route`, `approve_final` |
+| `revision` | `approve_revision_plan`, `resolve_revision_limit`, `review_draft`, `authorize_council`, `approve_final` |
+| `lessons` | `approve_lessons` |
+
+`finalization` has no awaiting-human state because explicit approval occurs while the visible candidate remains at `council` or `revision`; after approval, Codex writes `final.md` and advances. `complete` always has `status: complete` and no pending action.
 
 ## Stage 1: Selected idea
 
@@ -136,7 +153,7 @@ Ask for confirmation when research could expose confidential information, materi
 
 ### Task
 
-Research only the material questions. Separate verified facts, citations/links, disputed claims, and interpretation. Note dates and source quality. Produce useful interview questions without inferring the creator's position.
+Research only the material questions. Separate verified facts, citations/links, disputed claims, unresolved claims, and interpretation. Note dates and source quality. Produce useful interview questions without inferring the creator's position. If scope or confidentiality blocks progress, persist `research` + `awaiting_human` + `resolve_research_scope`.
 
 ### Output artifact
 
@@ -166,7 +183,7 @@ The research decision is recorded and any required initial research is complete.
 
 ### Task
 
-Ask exactly one question, wait, then append the answer to `interview.md`. After every answer, briefly record obtained material, missing coverage, and the next interviewing move. Choose among functional lenses: direct thesis, concrete example, strongest objection, uncomfortable/self-interested angle, personal significance, practical takeaway, and forward-looking implication. Persona labels are optional mnemonics; always state their functional purpose.
+Choose exactly one next question. Before showing it, append a pending-question record to `interview.md` containing the question, functional lens, material already obtained, missing coverage it targets, and `Answer: pending`; atomically set `interview` + `awaiting_human` + `answer_interview_question` in `run.json`, then validate. Show that question and stop. After the human answers, replace the pending marker with the answer and record obtained material, remaining gaps, and the next interviewing move. Choose among functional lenses: direct thesis, concrete example, strongest objection, uncomfortable/self-interested angle, personal significance, practical takeaway, and forward-looking implication. Persona labels are optional mnemonics; always state their functional purpose.
 
 Normally ask four to six questions, but stop on coverage rather than count. Synthesize `content-brief.md` without fabricating a view.
 
@@ -198,7 +215,7 @@ Load at this stage: `creator/profile.md`, `creator/voice.md`, `creator/lessons.m
 
 ### Task
 
-Draft primarily from the creator's interview language and thinking. Offer three hook options, one body, three closing options, and a recommended assembly. Use `bin/cf count` for the approximate character count. Flag factual, confidentiality, and material uncertainty issues.
+Draft primarily from the creator's interview language and thinking. Offer three hook options, one body, three closing options, and a recommended assembly. Use `bin/cf count draft-NN.md --section "Recommended assembled version"` for the post-body character count. Flag factual, confidentiality, and material uncertainty issues.
 
 ### Output artifact
 
@@ -232,7 +249,7 @@ Run one structured review—not separate processes—through six lenses: (1) ori
 
 ### Output artifact
 
-`council-01.md` (and `council-02.md` only after a later authorized/requested re-score).
+`council-01.md` (and `council-02.md` only after a later authorized/requested re-score). Record the human authorization/request in each Council artifact.
 
 ### Exit condition
 
@@ -240,7 +257,7 @@ The artifact contains every required section and recommends exactly one route: `
 
 ### Possible routes
 
-Go to `revision`, `interview`, `research`, or `finalization` as recommended and human-confirmed.
+Go to `revision`, `interview`, `research`, or `finalization` as recommended and human-confirmed. When a backward route needs confirmation, persist `council` + `awaiting_human` + `confirm_route`.
 
 ### Human gate
 
@@ -262,11 +279,11 @@ Write a concrete, bounded proposal explaining each intended change, its reason, 
 
 ### Output artifact
 
-`revision-plan-01.md`, then `draft-02.md`; optionally `council-02.md`. Use `-02` equivalents for one further round.
+Round 1 writes `revision-plan-01.md`, then `draft-02.md`; an optional requested re-score writes `council-02.md`. Round 2 writes `revision-plan-02.md`, then `draft-03.md`; an optional requested re-score writes `council-03.md` under an additional versioned artifact key.
 
 ### Exit condition
 
-The approved proposal is faithfully applied, deviations are disclosed, and the new draft is presented for review. Normally stop after two revision rounds.
+The approved proposal is faithfully applied, deviations are disclosed, `revision_round` is incremented only after the new draft is durably written, and the new draft is presented for review. Stop after two revision rounds.
 
 ### Possible routes
 
@@ -288,7 +305,7 @@ The approved draft, selected hook/closing, and remaining caveats.
 
 ### Task
 
-Create an immutable final copy, count it deterministically, and record selection, caveats, and approval. Do not publish.
+Create an immutable final copy, count its post body with `bin/cf count final.md --section "Approved post"`, and record selection, caveats, and approval. Do not publish.
 
 ### Output artifact
 

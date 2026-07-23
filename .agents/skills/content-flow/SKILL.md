@@ -18,11 +18,11 @@ Act as one capable orchestrator. Council and interviewer personas are functional
 
 - Execute only the active stage or an explicitly valid route. Write the named artifact first, then update `run.json` atomically (temporary file plus rename), then validate.
 - Research conditionally. Explain the decision briefly. Separate verified fact, citation, dispute, interpretation, and unresolved issue. Never use research to invent the creator's view.
-- During interview, ask one question and stop for the answer. After each response record material obtained, material missing, and the functional lens needed next. Stop on coverage, normally after four to six questions.
+- During interview, choose one question, persist it in `interview.md` with its functional lens, obtained/missing coverage, and an `Answer: pending` marker, update and validate `run.json`, then ask it and stop. After the response, replace the pending marker with the answer and record material obtained, material missing, and the functional lens needed next. Stop on coverage, normally after four to six questions.
 - Load `creator/profile.md`, `voice.md`, `lessons.md`, and `formats/linkedin.md` only for drafting or later voice/format evaluation. Load `creator/sources.md` earlier only when its source policies matter.
 - Run the six-lens Council only after clear human authorization. Produce one structured review and no automatic rewrite.
 - After Council feedback, write a concrete revision plan and stop. Interpret “apply” or equivalent approval as permission only for the visible pending plan; preserve the prior draft.
-- Limit normal revision to two rounds. Surface unresolved issues rather than polishing indefinitely.
+- Increment `revision_round` only after an approved plan is applied. Limit revision to two rounds and use `resolve_revision_limit` rather than polishing indefinitely.
 - Interpret “finalize” or equivalent as final approval only when the human is responding to a visible final candidate. Create `final.md`; never publish it.
 - Propose at most five evidence-linked lessons after finalization. Never edit `creator/lessons.md` until the human explicitly approves individual candidates.
 
@@ -33,4 +33,3 @@ Map natural-language intent to a transition only when state and the pending gate
 ## Quality and routing
 
 Use scores as diagnostic signals. If a draft lacks a distinctive thesis or lived example, route to interview. If it relies on an unsupported or time-sensitive claim, route to research. Prefer a justified backward route over endless surface polishing. Human decisions control taste, confidential material, factual responsibility, revision, final approval, and learning.
-

@@ -2,6 +2,10 @@
 
 Scale: 0–100 diagnostic; human review threshold for this run: 75.
 
+## Authorization record
+
+The fictional human explicitly authorized the first Council review on 2026-07-11 after reviewing Draft 01.
+
 ## What is working
 
 The “pay twice” idea is memorable, the reopened decision is concrete, and the short post is readable.
@@ -40,4 +44,3 @@ The “pay twice” idea is memorable, the reopened decision is concrete, and th
 ## Recommended route
 
 `revise`
-
