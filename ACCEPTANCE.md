@@ -35,7 +35,9 @@ python3 /home/barney/.codex/skills/.system/skill-creator/scripts/quick_validate.
 - [ ] `count` remains deterministic and offline.
 - [ ] Vault capture/show/list/update/rebuild/validate work under every data-root selector.
 - [ ] One or more vault items can start a run; run and item state link bidirectionally.
-- [ ] Parking updates origins or creates one run-fragment, resume restores state, and final linkage marks only direct origins used by default.
+- [ ] Parking preserves history and updates origins or creates one run-fragment; resume restores state; final linkage records successful usage and returns reusable items to ready.
+- [ ] Sources and ideas can support repeated completed runs, completed artifacts can contribute later, and archived items remain archived.
+- [ ] Generated index views surface successful reusable items and multi-run rich sources independently from status.
 - [ ] Validation detects malformed items, duplicate IDs/relations, unsafe paths, stale index, missing required relationships, developing-without-active-run, and invalid parked state.
 
 ## Verification

@@ -12,7 +12,8 @@ Build useful creator context without inventing preferences.
 1. Run `bin/cf data-root` with any user-selected `--data-dir` and report its exact path. `DATA_ROOT.md` is the canonical selection rule; do not duplicate or improvise it. If setup is incomplete, initialize through `bin/cf init` with the same selection. Never initialize creator content by hand.
    Ensure `vault/items/`, `vault/assets/`, and generated `vault/index.md` exist by running
    `bin/cf vault rebuild-index` with the same selection. Explain briefly that the private
-   vault retains future source/idea material and parked runs; do not turn setup into a vault
+   vault retains reusable sources, ideas, completed-artifact provenance, and parked runs;
+   successful use is history rather than consumption. Do not turn setup into a vault
    questionnaire.
 2. Before any edit, list the exact paths under `<data-root>/creator` that you intend to modify. Inspect `profile.md`, `voice.md`, `lessons.md`, `sources.md`, and `formats/linkedin.md`; summarize populated, missing, uncertain, and conflicting fields.
 3. Read [references/onboarding-questions.md](references/onboarding-questions.md). Ask one focused question at a time, prioritizing gaps that materially affect writing. Do not require every question.

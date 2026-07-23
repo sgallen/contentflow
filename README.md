@@ -100,10 +100,11 @@ bin/cf vault resume-run <run-id>
 ```
 
 Parking preserves the entire run. An originating item is updated rather than duplicated;
-an unlinked run creates one `run-fragment`. When a final artifact exists,
-`bin/cf vault finalize-run <run-id>` records it and marks direct origins `used` unless the
-human chooses `--keep-origin-status`. Contributing sources are not automatically marked
-used; developing contributors return to `ready`.
+an unlinked run creates one `run-fragment`. Parking preserves prior successful uses and
+records the assessment for later mining. When a final artifact exists,
+`bin/cf vault finalize-run <run-id>` records successful history for each linked origin,
+contributor, and derived idea. Non-archived items normally return to `ready`; another
+unfinished active run keeps them `developing`.
 
 ## Resume or inspect
 
@@ -118,11 +119,24 @@ Use `--data-dir <path>` on `new-run`, `status`, or `validate`, or set `CONTENT_F
 
 ## Vault lifecycle
 
-`inbox` is captured but unreviewed; `ready` is understood enough to consider;
-`developing` has an active run; `parked` retains useful incomplete development; `used`
-contributed directly to final content; and `archived` is intentionally out of active
-consideration. Supported transitions are documented in `VAULT.md`. Nothing ages into
-`archived`, and used or archived files are retained.
+`inbox` is captured but unreviewed; `ready` is available for development or reuse;
+`developing` has an unfinished active run; `parked` preserves value that is not currently
+ready; and `archived` is intentionally out of active consideration. Usage is separate
+history (`successful_runs`, `use_count`, `last_used_at`, and `final_artifacts`), not an
+availability state. Sources, ideas, successful angles, and completed artifacts may all
+support later runs. Nothing ages or succeeds automatically into `archived`.
+
+Useful inspection commands include:
+
+```bash
+bin/cf vault list --status ready
+bin/cf vault list --successful yes
+bin/cf vault show <item-id>
+```
+
+The generated index surfaces successful reusable items and multi-run rich sources without
+removing them from their current availability views. See `VAULT.md` for the one-to-many
+lineage model and validation rules.
 
 ## Tests and utilities
 

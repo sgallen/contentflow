@@ -19,6 +19,7 @@ from content_flow.cli import (
     CFError,
     CREATOR_FILES,
     extract_markdown_section,
+    git_safety_description,
     initialize_data_root,
     load_state,
     main,
@@ -116,6 +117,38 @@ class ContentFlowCLITests(unittest.TestCase):
         (repository / ".gitignore").write_text("private-data/\n", encoding="utf-8")
         with self.assertRaisesRegex(CFError, "is not ignored"):
             initialize_data_root(data_root, ROOT)
+
+    def test_nested_data_repository_is_checked_against_ignored_parent(self) -> None:
+        repository = self.root / "repository"
+        data_root = repository / "private-data"
+        data_root.mkdir(parents=True)
+        subprocess.run(["git", "init", "-q", str(repository)], check=True)
+        (repository / ".gitignore").write_text("private-data/\n", encoding="utf-8")
+        subprocess.run(["git", "init", "-q", str(data_root)], check=True)
+
+        initialize_data_root(data_root, ROOT)
+
+        self.assertEqual(missing_creator_files(data_root), [])
+        self.assertEqual(
+            git_safety_description(data_root),
+            f"data root is Git repository {data_root.resolve()}; "
+            f"ignored by parent Git repository {repository.resolve()}",
+        )
+
+    def test_nested_data_repository_must_be_ignored_by_parent(self) -> None:
+        repository = self.root / "repository"
+        data_root = repository / "private-data"
+        data_root.mkdir(parents=True)
+        subprocess.run(["git", "init", "-q", str(repository)], check=True)
+        subprocess.run(["git", "init", "-q", str(data_root)], check=True)
+
+        with self.assertRaisesRegex(CFError, "is not ignored"):
+            initialize_data_root(data_root, ROOT)
+        self.assertEqual(
+            git_safety_description(data_root),
+            f"data root is Git repository {data_root.resolve()}; "
+            f"NOT ignored by parent Git repository {repository.resolve()}",
+        )
 
     def test_default_private_root_is_git_ignored(self) -> None:
         result = subprocess.run(

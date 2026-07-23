@@ -30,11 +30,14 @@ require exact phrases.
    analysis or a reason.
 3. **Enriched capture:** first quick-capture. Read the complete item and any actually
    available source. Add only requested/useful Summary, Useful specifics or excerpts,
-   Potential content angles, and Open questions. Label source-derived material separately
+   Potential content angles, Open questions, and optional Mining notes. Mining notes may
+   distinguish explored and unexplored angles, prior audiences/formats, revisit triggers,
+   unanswered questions, and related completed assets. Label source evidence separately
    from model interpretation; cite authoritative sources for current/factual claims;
-   observe quotation limits; never invent the creator's view. Suggested tags are proposals.
-   After editing, run `bin/cf vault update <id> --status <unchanged-status>` to refresh
-   `updated_at`, then `bin/cf vault rebuild-index` and `bin/cf vault validate`.
+   observe quotation limits; never invent the creator's view or missing usage history.
+   Suggested tags and mining opportunities are proposals. After editing, run
+   `bin/cf vault update <id> --status <unchanged-status>` to refresh `updated_at`, then
+   `bin/cf vault rebuild-index` and `bin/cf vault validate`.
 4. Do not create an asset directory unless a useful large transcript, excerpt, imported
    note, or document is actually available. Put it only under
    `<data-root>/vault/assets/<item-id>/` and reference it from the item.
@@ -45,8 +48,10 @@ require exact phrases.
 ## Start or resume from vault material
 
 1. Resolve each requested ID with `bin/cf vault show`; read the complete item and report
-   title, status, exact source, development history, and parking notes. If a description
-   matches more than one item, show the candidates and ask for confirmation.
+   title, status, exact source, related and successful runs, final artifacts, explored
+   angles, Mining notes, parking notes, known remaining opportunities, and potential
+   duplication risks. If a description matches more than one item, show the candidates and
+   ask for confirmation. Prior success never blocks reuse.
 2. Create through the normal deterministic mechanism:
    `bin/cf new-run --vault-item <origin-id>`; repeat `--vault-item` for multiple direct
    origins and use repeated `--contributing-vault-item` for supporting items.
@@ -56,14 +61,23 @@ require exact phrases.
 4. For a parked run, read its state and relevant artifacts, report the prior assessment,
    use `bin/cf vault resume-run <run>`, validate both sides, and resume at the preserved
    stage rather than creating a new run.
+5. A source or idea may start multiple runs. A completed artifact may participate in later
+   work through an existing item whose `final_artifacts` preserves its provenance; select
+   that item as contributing material rather than copying the earlier run. Parked items and
+   unexplored angles may be selected deliberately.
+6. For a proven idea, model-labeled opportunities may include a deeper, narrower, or
+   contrarian version; another audience or format; an update from new evidence; a
+   reader-response follow-up; or repurposing from completed content. Treat these as
+   judgments, not CLI facts, and never declare the idea exhausted automatically.
 
 ## Park a run
 
 Parking is a valid human-controlled route, not failure. Before parking, read current state
 and relevant artifacts and write the next `parking-assessment-NN.md` in the run. It must
 honestly summarize: what remains promising, strongest material collected, why the run is
-not being completed, what is missing, recommended next step, and whether to resume or
-reconsider from a new angle. Do not manufacture strengths or gaps.
+not being completed, what is missing, conditions that may make it worth revisiting,
+recommended next angle or action, and whether to resume or reconsider from a new angle. Do
+not manufacture strengths or gaps. Preserve previous successful uses and completed assets.
 
 Run `bin/cf vault park-run <run> --reason "..." --assessment-file <path>` with the same
 data-root selection, then validate the run and vault. The command updates existing origins
@@ -80,7 +94,13 @@ Preserve every run artifact and stop.
 - Run the six-lens Council only after clear human authorization. Produce one structured review and no automatic rewrite.
 - After Council feedback, write a concrete revision plan and stop. Interpret “apply” or equivalent approval as permission only for the visible pending plan; preserve the prior draft.
 - Increment `revision_round` only after an approved plan is applied. Limit revision to two rounds and use `resolve_revision_limit` rather than polishing indefinitely.
-- Interpret “finalize” or equivalent as final approval only when the human is responding to a visible final candidate. Create `final.md`; never publish it. After validating it, report linked origins and contributors, ask only if the human wants a direct origin not marked `used`, then run `bin/cf vault finalize-run <run>` (or `--keep-origin-status`). This preserves all items, records the final path, marks only direct origins used by default, and never marks every contributor used.
+- Interpret “finalize” or equivalent as final approval only when the human is responding
+  to a visible final candidate. Create `final.md`; never publish it. After validating it,
+  report direct origins, contributing sources, and ideas derived during the run, then run
+  `bin/cf vault finalize-run <run>`. This records successful history for every linked role,
+  preserves all prior history, and normally returns non-archived items to `ready` without
+  implying exhaustion. Ask whether the human wants the final piece independently
+  discoverable as reusable content, but do not create another item without approval.
 - Propose at most five evidence-linked lessons after finalization. Never edit `<data-root>/creator/lessons.md` until the human explicitly approves individual candidates.
 
 ## Intent is semantic, not keyword-based

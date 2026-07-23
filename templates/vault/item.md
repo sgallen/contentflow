@@ -8,6 +8,11 @@ updated_at: "YYYY-MM-DDTHH:MM:SSZ"
 tags: []
 related_items: []
 related_runs: []
+successful_runs: []
+use_count: 0
+derived_items: []
+source_items: []
+final_artifacts: []
 ---
 
 ## Why this was saved
@@ -21,6 +26,8 @@ related_runs: []
 ## Useful specifics or excerpts
 
 ## Open questions
+
+## Mining notes
 
 ## Development history
 

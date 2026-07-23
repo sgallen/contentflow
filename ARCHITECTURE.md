@@ -27,7 +27,8 @@ The **procedure** lives in `AGENTS.md`, `WORKFLOW.md`, and the two repository sk
 The **vault** is persistent intake and incubation: material may exist without a run and may
 survive several development attempts. A **run** is one bounded attempt to develop selected
 material. **Final content** is the human-approved artifact within a run; finalization never
-deletes its vault provenance.
+deletes its vault provenance or consumes the underlying material. Availability status and
+successful-use history remain independent.
 
 ## Persistent and per-run context
 
@@ -37,6 +38,11 @@ canonical source, idea, observation, quote, excerpt, and run-fragment records.
 avoid creator files; drafting loads only relevant creator files and current-run artifacts.
 Selection records vault IDs in `run.json`, copies or references useful material in
 `spike.md`, and records the run ID back on every selected item.
+
+Lineage is one-to-many: sources and observations may support multiple ideas or angles;
+items may support multiple runs; runs produce completed assets; and an item carrying a
+completed-asset reference may contribute to a later run. Run roles distinguish direct
+origins, supporting contributors, and ideas derived during development.
 
 ## Responsibilities
 
@@ -66,5 +72,6 @@ Skills are Markdown, templates and artifacts are ordinary files, and tooling use
 ## Future Oracle compatibility
 
 The canonical item files provide a stable input source for a possible future Oracle that
-could help rank or revisit material. No Oracle, scheduling, automatic selection, database,
-connector, or background process exists in this version.
+could reason over explicit availability, successful history, lineage, and revisit notes.
+No Oracle, scheduling, automatic selection, semantic search, database, connector, or
+background process exists in this version.

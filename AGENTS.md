@@ -23,4 +23,5 @@ This repository is a local-first personal content workflow. Codex is the interac
 - Name sequential artifacts with two-digit revisions (`draft-01.md`, `council-01.md`).
 - Never overwrite a human-approved artifact; create the next version.
 - Keep private artifacts under the selected data root, never under `examples/`. Keep secrets and confidential details out of Git. Record a sanitized confidentiality warning instead.
+- The selected data root may intentionally be its own private Git repository nested inside and wholly ignored by this public repository. Interpret `bin/cf data-root` Git safety relative to the containing repository; the private repository is expected to track its own contents.
 - Run `python3 -m unittest discover -s tests -v` before considering workflow/tooling changes complete.

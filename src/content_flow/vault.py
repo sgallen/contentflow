@@ -10,7 +10,7 @@ from typing import Any, Iterable
 
 
 VAULT_KINDS = ("source", "idea", "observation", "quote", "excerpt", "run-fragment")
-VAULT_STATUSES = ("inbox", "ready", "developing", "parked", "used", "archived")
+VAULT_STATUSES = ("inbox", "ready", "developing", "parked", "archived")
 VAULT_SECTIONS = (
     "Why this was saved",
     "Source or raw material",
@@ -18,6 +18,7 @@ VAULT_SECTIONS = (
     "Potential content angles",
     "Useful specifics or excerpts",
     "Open questions",
+    "Mining notes",
     "Development history",
     "Parking notes",
 )
@@ -31,6 +32,11 @@ VAULT_REQUIRED_KEYS = (
     "tags",
     "related_items",
     "related_runs",
+    "successful_runs",
+    "use_count",
+    "derived_items",
+    "source_items",
+    "final_artifacts",
 )
 VAULT_KEY_ORDER = (
     "id",
@@ -46,9 +52,23 @@ VAULT_KEY_ORDER = (
     "tags",
     "related_items",
     "related_runs",
+    "successful_runs",
+    "last_used_at",
+    "use_count",
+    "derived_items",
+    "source_items",
+    "final_artifacts",
     "revisit_after",
 )
-VAULT_LIST_KEYS = ("tags", "related_items", "related_runs")
+VAULT_LIST_KEYS = (
+    "tags",
+    "related_items",
+    "related_runs",
+    "successful_runs",
+    "derived_items",
+    "source_items",
+    "final_artifacts",
+)
 ITEM_ID_PATTERN = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
 TIMESTAMP_PATTERN = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
 DATE_PATTERN = re.compile(r"\d{4}-\d{2}-\d{2}")
@@ -83,6 +103,8 @@ def _parse_scalar(raw: str) -> Any:
             raise VaultFormatError(f"invalid quoted or flow-style YAML value: {value}") from exc
     if value in ("true", "false"):
         return value == "true"
+    if re.fullmatch(r"-?\d+", value):
+        return int(value)
     return value
 
 
@@ -215,6 +237,18 @@ def validate_metadata(metadata: dict[str, Any], path: Path | None = None) -> lis
                 datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ")
             except ValueError:
                 errors.append(f"{key} is not a real UTC calendar timestamp")
+    last_used = metadata.get("last_used_at")
+    if last_used is not None:
+        if not isinstance(last_used, str) or not TIMESTAMP_PATTERN.fullmatch(last_used):
+            errors.append("last_used_at must be a UTC timestamp like 2026-07-23T12:34:56Z")
+        else:
+            try:
+                datetime.strptime(last_used, "%Y-%m-%dT%H:%M:%SZ")
+            except ValueError:
+                errors.append("last_used_at is not a real UTC calendar timestamp")
+    use_count = metadata.get("use_count")
+    if isinstance(use_count, bool) or not isinstance(use_count, int) or use_count < 0:
+        errors.append("use_count must be a non-negative integer")
     published = metadata.get("source_published_at")
     if published is not None and (
         not isinstance(published, str)
@@ -245,16 +279,62 @@ def validate_metadata(metadata: dict[str, Any], path: Path | None = None) -> lis
             continue
         if len(values) != len(set(values)):
             errors.append(f"{key} must not contain duplicates")
-    related_items = metadata.get("related_items")
-    if isinstance(related_items, list):
-        for value in related_items:
+    for key in ("related_items", "derived_items", "source_items"):
+        values = metadata.get(key)
+        if not isinstance(values, list):
+            continue
+        for value in values:
             if not ITEM_ID_PATTERN.fullmatch(value):
-                errors.append(f"unsafe related item id: {value}")
+                errors.append(f"unsafe {key[:-1].replace('_', ' ')} id: {value}")
+            if value == item_id:
+                errors.append(f"{key} must not reference the item itself")
+    for key in ("related_runs", "successful_runs"):
+        values = metadata.get(key)
+        if not isinstance(values, list):
+            continue
+        for value in values:
+            if not ITEM_ID_PATTERN.fullmatch(value):
+                errors.append(f"unsafe {key[:-1].replace('_', ' ')} id: {value}")
     related_runs = metadata.get("related_runs")
-    if isinstance(related_runs, list):
-        for value in related_runs:
-            if not ITEM_ID_PATTERN.fullmatch(value):
-                errors.append(f"unsafe related run id: {value}")
+    successful_runs = metadata.get("successful_runs")
+    if isinstance(related_runs, list) and isinstance(successful_runs, list):
+        missing = [run_id for run_id in successful_runs if run_id not in related_runs]
+        if missing:
+            errors.append("successful_runs must also be present in related_runs")
+        if isinstance(use_count, int) and not isinstance(use_count, bool) and use_count != len(successful_runs):
+            errors.append("use_count must equal the number of successful_runs")
+        if successful_runs and last_used is None:
+            errors.append("successful_runs require last_used_at")
+        if not successful_runs and last_used is not None:
+            errors.append("last_used_at requires at least one successful run")
+    related_items = metadata.get("related_items")
+    for key in ("derived_items", "source_items"):
+        values = metadata.get(key)
+        if isinstance(related_items, list) and isinstance(values, list):
+            if any(value not in related_items for value in values):
+                errors.append(f"{key} must be a subset of related_items")
+    final_artifacts = metadata.get("final_artifacts")
+    if isinstance(final_artifacts, list):
+        artifact_runs: set[str] = set()
+        for value in final_artifacts:
+            artifact_path = Path(value)
+            if (
+                artifact_path.is_absolute()
+                or ".." in artifact_path.parts
+                or len(artifact_path.parts) != 3
+                or artifact_path.parts[0] != "runs"
+                or not ITEM_ID_PATTERN.fullmatch(artifact_path.parts[1])
+                or artifact_path.parts[2] != artifact_path.name
+                or artifact_path.name in ("", ".", "..")
+            ):
+                errors.append(f"unsafe final artifact path: {value}")
+                continue
+            artifact_runs.add(artifact_path.parts[1])
+        if isinstance(successful_runs, list):
+            if any(run_id not in successful_runs for run_id in artifact_runs):
+                errors.append("final_artifacts may reference only successful_runs")
+            if any(run_id not in artifact_runs for run_id in successful_runs):
+                errors.append("each successful run must have a corresponding final artifact")
     for key in ("source_url", "source_type", "source_author"):
         if key in metadata and (not isinstance(metadata[key], str) or not metadata[key]):
             errors.append(f"{key} must be a non-empty string when present")
@@ -306,7 +386,7 @@ def write_item(path: Path, metadata: dict[str, Any], body: str, *, overwrite: bo
     temporary.replace(path)
 
 
-def build_index(items: Iterable[tuple[Path, dict[str, Any]]]) -> str:
+def build_index(items: Iterable[tuple[Path, dict[str, Any]]], today: date | None = None) -> str:
     records = sorted(items, key=lambda record: (record[1]["updated_at"], record[1]["id"]), reverse=True)
     lines = [
         "# Content Flow vault index",
@@ -314,9 +394,33 @@ def build_index(items: Iterable[tuple[Path, dict[str, Any]]]) -> str:
         "<!-- Generated by `bin/cf vault rebuild-index`; edit item files, not this index. -->",
         "",
     ]
-    for status in VAULT_STATUSES:
-        lines.extend((f"## {status}", ""))
-        selected = [record for record in records if record[1]["status"] == status]
+    current_date = today or date.today()
+    views = (
+        ("Inbox", lambda item: item["status"] == "inbox"),
+        ("Ready to develop", lambda item: item["status"] == "ready"),
+        ("Currently developing", lambda item: item["status"] == "developing"),
+        ("Parked", lambda item: item["status"] == "parked"),
+        (
+            "Previously successful and reusable",
+            lambda item: item["status"] != "archived" and item["use_count"] > 0,
+        ),
+        (
+            "Rich sources with multiple related runs",
+            lambda item: item["status"] != "archived"
+            and item["kind"] in ("source", "observation")
+            and len(item["related_runs"]) > 1,
+        ),
+        (
+            "Revisit due",
+            lambda item: item["status"] != "archived"
+            and isinstance(item.get("revisit_after"), str)
+            and item["revisit_after"] <= current_date.isoformat(),
+        ),
+        ("Archived", lambda item: item["status"] == "archived"),
+    )
+    for heading, predicate in views:
+        lines.extend((f"## {heading}", ""))
+        selected = [record for record in records if predicate(record[1])]
         if not selected:
             lines.extend(("_No items._", ""))
             continue
@@ -324,7 +428,9 @@ def build_index(items: Iterable[tuple[Path, dict[str, Any]]]) -> str:
             tags = ", ".join(metadata["tags"]) if metadata["tags"] else "none"
             lines.append(
                 f"- [{metadata['id']}](items/{metadata['id']}.md) — "
-                f"{metadata['title']} | {metadata['kind']} | updated {metadata['updated_at'][:10]} | tags: {tags}"
+                f"{metadata['title']} | {metadata['kind']} | status: {metadata['status']} | "
+                f"successful uses: {metadata['use_count']} | updated {metadata['updated_at'][:10]} | "
+                f"tags: {tags}"
             )
         lines.append("")
     return "\n".join(lines).rstrip() + "\n"
@@ -367,12 +473,23 @@ def read_all_items(data_root: Path) -> tuple[list[tuple[Path, dict[str, Any], st
 def validate_relationships(data_root: Path) -> tuple[list[str], list[str]]:
     records, errors = read_all_items(data_root)
     warnings: list[str] = []
-    known_ids = {metadata["id"] for _, metadata, _ in records}
+    by_id = {metadata["id"]: (path, metadata) for path, metadata, _ in records}
+    known_ids = set(by_id)
     runs_root = data_root / "runs"
     for path, metadata, _ in records:
         for related in metadata["related_items"]:
             if related not in known_ids:
                 errors.append(f"{path}: related item does not exist locally: {related}")
+        for derived in metadata["derived_items"]:
+            if derived in by_id and metadata["id"] not in by_id[derived][1]["source_items"]:
+                errors.append(
+                    f"{path}: derived item '{derived}' must reciprocally name '{metadata['id']}' in source_items"
+                )
+        for source in metadata["source_items"]:
+            if source in by_id and metadata["id"] not in by_id[source][1]["derived_items"]:
+                errors.append(
+                    f"{path}: source item '{source}' must reciprocally name '{metadata['id']}' in derived_items"
+                )
         missing_runs = [run_id for run_id in metadata["related_runs"] if not (runs_root / run_id / "run.json").is_file()]
         if metadata["status"] == "developing" and missing_runs:
             errors.extend(f"{path}: developing item references missing active run: {run_id}" for run_id in missing_runs)
@@ -388,10 +505,27 @@ def validate_relationships(data_root: Path) -> tuple[list[str], list[str]]:
                     state = json.loads(state_path.read_text(encoding="utf-8"))
                 except (json.JSONDecodeError, UnicodeDecodeError):
                     continue
-                if state.get("status") in ("active", "awaiting_human"):
+                if not state.get("final_artifact") and state.get("status") in (
+                    "active",
+                    "awaiting_human",
+                ):
                     active = True
             if not active:
                 errors.append(f"{path}: developing item requires at least one active linked run")
+        for artifact in metadata["final_artifacts"]:
+            artifact_path = data_root / artifact
+            run_id = Path(artifact).parts[1]
+            if not artifact_path.is_file():
+                warnings.append(f"{path}: historical final artifact is not present locally: {artifact}")
+                continue
+            state_path = runs_root / run_id / "run.json"
+            if state_path.is_file():
+                try:
+                    state = json.loads(state_path.read_text(encoding="utf-8"))
+                except (json.JSONDecodeError, UnicodeDecodeError):
+                    continue
+                if state.get("artifacts", {}).get("final") != Path(artifact).name:
+                    errors.append(f"{path}: final artifact does not match successful run '{run_id}'")
     index = data_root / "vault" / "index.md"
     if not index.exists():
         errors.append(f"{index}: generated index is missing")

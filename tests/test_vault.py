@@ -48,6 +48,20 @@ class VaultCLITests(unittest.TestCase):
         self.assertEqual((result, stderr), (0, ""))
         return next(line.split(": ", 1)[1] for line in stdout.splitlines() if line.startswith("item_id: "))
 
+    def finalize(self, run_path: Path) -> None:
+        (run_path / "final.md").write_text("# Final\n", encoding="utf-8")
+        state_path = run_path / "run.json"
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+        state["artifacts"]["final"] = "final.md"
+        state_path.write_text(json.dumps(state), encoding="utf-8")
+        result, _, stderr = self.run_cli("vault", "finalize-run", run_path.name)
+        self.assertEqual((result, stderr), (0, ""))
+
+    def start(self, *arguments: str) -> Path:
+        result, stdout, stderr = self.run_cli("new-run", *arguments)
+        self.assertEqual((result, stderr), (0, ""))
+        return Path(next(line.split(": ", 1)[1] for line in stdout.splitlines() if line.startswith("run: ")))
+
     def test_quick_capture_preserves_url_reason_and_minimal_metadata(self) -> None:
         exact_url = "https://example.test/watch?v=A%2FB&x=1"
         item_id = self.capture(
@@ -61,8 +75,12 @@ class VaultCLITests(unittest.TestCase):
         metadata, body = load_item(path)
         self.assertEqual(metadata["source_url"], exact_url)
         self.assertEqual(metadata["status"], "inbox")
+        self.assertEqual(metadata["use_count"], 0)
+        self.assertEqual(metadata["successful_runs"], [])
+        self.assertEqual(metadata["final_artifacts"], [])
         self.assertIn("It may explain a recurring team problem.", body)
         self.assertIn(exact_url, body)
+        self.assertIn("## Mining notes", body)
 
     def test_item_filename_and_id_are_safe_and_capture_never_overwrites(self) -> None:
         first = self.capture(" Café / 東京 ")
@@ -109,6 +127,7 @@ class VaultCLITests(unittest.TestCase):
         self.assertEqual(result, 0)
         self.assertIn(ready, stdout)
         self.assertNotIn("Other idea", stdout)
+        self.assertIn("SUCCESSFUL_USES", stdout)
 
     def test_status_and_revisit_updates_reject_invalid_values_and_transitions(self) -> None:
         item_id = self.capture()
@@ -119,9 +138,6 @@ class VaultCLITests(unittest.TestCase):
         metadata, _ = load_item(self.data_root / "vault" / "items" / f"{item_id}.md")
         self.assertEqual(metadata["status"], "ready")
         self.assertEqual(metadata["revisit_after"], "2026-08-10")
-        result, _, stderr = self.run_cli("vault", "update", item_id, "--status", "used")
-        self.assertEqual(result, 2)
-        self.assertIn("invalid vault status transition", stderr)
         with contextlib.redirect_stderr(io.StringIO()), self.assertRaisesRegex(SystemExit, "2"):
             main(
                 [
@@ -290,11 +306,10 @@ class VaultCLITests(unittest.TestCase):
         metadata, _ = load_item(items[0])
         self.assertEqual(metadata["status"], "developing")
 
-    def test_finalize_marks_only_origin_used_and_records_final_path(self) -> None:
+    def test_finalize_returns_all_linked_items_ready_and_records_successful_usage(self) -> None:
         origin = self.capture("Direct")
         contributor = self.capture("Supporting")
-        _, stdout, _ = self.run_cli(
-            "new-run",
+        run_path = self.start(
             "--title",
             "Final link",
             "--vault-item",
@@ -302,21 +317,156 @@ class VaultCLITests(unittest.TestCase):
             "--contributing-vault-item",
             contributor,
         )
-        run_path = Path(next(line.split(": ", 1)[1] for line in stdout.splitlines() if line.startswith("run: ")))
-        (run_path / "final.md").write_text("# Final\n", encoding="utf-8")
-        state_path = run_path / "run.json"
-        state = json.loads(state_path.read_text(encoding="utf-8"))
-        state["artifacts"]["final"] = "final.md"
-        state_path.write_text(json.dumps(state), encoding="utf-8")
-        result, _, _ = self.run_cli("vault", "finalize-run", run_path.name)
-        self.assertEqual(result, 0)
+        self.finalize(run_path)
         origin_meta, _ = load_item(self.data_root / "vault" / "items" / f"{origin}.md")
         contributor_meta, _ = load_item(self.data_root / "vault" / "items" / f"{contributor}.md")
-        self.assertEqual(origin_meta["status"], "used")
+        self.assertEqual(origin_meta["status"], "ready")
         self.assertEqual(contributor_meta["status"], "ready")
+        for metadata in (origin_meta, contributor_meta):
+            self.assertEqual(metadata["successful_runs"], [run_path.name])
+            self.assertEqual(metadata["use_count"], 1)
+            self.assertEqual(
+                metadata["final_artifacts"],
+                [f"runs/{run_path.name}/final.md"],
+            )
+            self.assertIsNotNone(metadata["last_used_at"])
+        result, _, stderr = self.run_cli("vault", "finalize-run", run_path.name)
+        self.assertEqual((result, stderr), (0, ""))
+        origin_meta, _ = load_item(self.data_root / "vault" / "items" / f"{origin}.md")
+        self.assertEqual((origin_meta["use_count"], len(origin_meta["successful_runs"])), (1, 1))
         self.assertEqual(load_state(run_path)["final_artifact"], "final.md")
         result, _, _ = self.run_cli("vault", "validate")
         self.assertEqual(result, 0)
+
+    def test_same_source_and_idea_can_complete_multiple_distinct_runs(self) -> None:
+        source = self.capture("Reusable source")
+        first = self.start("--title", "First angle", "--vault-item", source)
+        self.finalize(first)
+        metadata, _ = load_item(self.data_root / "vault" / "items" / f"{source}.md")
+        self.assertEqual((metadata["status"], metadata["use_count"]), ("ready", 1))
+
+        second = self.start("--title", "Second angle", "--vault-item", source)
+        metadata, _ = load_item(self.data_root / "vault" / "items" / f"{source}.md")
+        self.assertEqual((metadata["status"], metadata["use_count"]), ("developing", 1))
+        self.finalize(second)
+        metadata, _ = load_item(self.data_root / "vault" / "items" / f"{source}.md")
+        self.assertEqual(metadata["status"], "ready")
+        self.assertEqual(metadata["related_runs"], [first.name, second.name])
+        self.assertEqual(metadata["successful_runs"], [first.name, second.name])
+        self.assertEqual(metadata["use_count"], 2)
+        self.assertEqual(
+            metadata["final_artifacts"],
+            [f"runs/{first.name}/final.md", f"runs/{second.name}/final.md"],
+        )
+        result, _, _ = self.run_cli("vault", "validate")
+        self.assertEqual(result, 0)
+
+    def test_successful_item_can_be_parked_and_resumed_without_losing_history(self) -> None:
+        item_id = self.capture("Proven idea")
+        completed = self.start("--title", "Completed angle", "--vault-item", item_id)
+        self.finalize(completed)
+        parked = self.start("--title", "Third angle", "--vault-item", item_id)
+        result, _, _ = self.run_cli("vault", "park-run", parked.name, "--reason", "Needs evidence")
+        self.assertEqual(result, 0)
+        metadata, _ = load_item(self.data_root / "vault" / "items" / f"{item_id}.md")
+        self.assertEqual((metadata["status"], metadata["use_count"]), ("parked", 1))
+        self.assertEqual(metadata["successful_runs"], [completed.name])
+        result, _, _ = self.run_cli("vault", "resume-run", parked.name)
+        self.assertEqual(result, 0)
+        metadata, _ = load_item(self.data_root / "vault" / "items" / f"{item_id}.md")
+        self.assertEqual((metadata["status"], metadata["use_count"]), ("developing", 1))
+
+    def test_parked_or_abandoned_run_does_not_increase_use_count(self) -> None:
+        item_id = self.capture("Attempted angle")
+        run_path = self.start("--vault-item", item_id)
+        result, _, _ = self.run_cli("vault", "park-run", run_path.name, "--reason", "Not ready")
+        self.assertEqual(result, 0)
+        metadata, _ = load_item(self.data_root / "vault" / "items" / f"{item_id}.md")
+        self.assertEqual(metadata["related_runs"], [run_path.name])
+        self.assertEqual(metadata["successful_runs"], [])
+        self.assertEqual(metadata["use_count"], 0)
+        self.assertNotIn("last_used_at", metadata)
+
+    def test_completed_content_can_contribute_to_a_later_run(self) -> None:
+        item_id = self.capture("Completed-content provenance")
+        completed = self.start("--title", "Original content", "--vault-item", item_id)
+        self.finalize(completed)
+        later = self.start(
+            "--title",
+            "Follow-up",
+            "--contributing-vault-item",
+            item_id,
+        )
+        state = load_state(later)
+        self.assertEqual(state["contributing_vault_items"], [item_id])
+        spike = (later / "spike.md").read_text(encoding="utf-8")
+        self.assertIn(f"runs/{completed.name}/final.md", spike)
+        self.assertIn("Successful uses: 1", spike)
+
+    def test_archived_item_remains_archived_when_linked_run_is_finalized(self) -> None:
+        item_id = self.capture("Archive after selection")
+        run_path = self.start("--vault-item", item_id)
+        result, _, _ = self.run_cli("vault", "update", item_id, "--status", "archived")
+        self.assertEqual(result, 0)
+        self.finalize(run_path)
+        metadata, _ = load_item(self.data_root / "vault" / "items" / f"{item_id}.md")
+        self.assertEqual(metadata["status"], "archived")
+        self.assertEqual(metadata["use_count"], 1)
+
+    def test_index_and_list_surface_successful_reusable_and_rich_sources(self) -> None:
+        result, stdout, stderr = self.run_cli(
+            "vault",
+            "capture",
+            "--kind",
+            "source",
+            "--title",
+            "Rich source",
+        )
+        self.assertEqual((result, stderr), (0, ""))
+        item_id = next(line.split(": ", 1)[1] for line in stdout.splitlines() if line.startswith("item_id: "))
+        for title in ("Angle one", "Angle two"):
+            run_path = self.start("--title", title, "--vault-item", item_id)
+            self.finalize(run_path)
+        index = (self.data_root / "vault" / "index.md").read_text(encoding="utf-8")
+        self.assertIn("## Previously successful and reusable", index)
+        self.assertIn("## Rich sources with multiple related runs", index)
+        self.assertGreaterEqual(index.count(f"(items/{item_id}.md)"), 3)
+        result, stdout, _ = self.run_cli("vault", "list", "--successful", "yes")
+        self.assertEqual(result, 0)
+        self.assertIn(item_id, stdout)
+
+    def test_link_run_supports_derived_items_as_a_distinct_role(self) -> None:
+        derived = self.capture("Idea discovered in run")
+        run_path = self.start("--title", "Parent run")
+        result, _, stderr = self.run_cli(
+            "vault",
+            "link-run",
+            derived,
+            run_path.name,
+            "--role",
+            "derived",
+        )
+        self.assertEqual((result, stderr), (0, ""))
+        state = load_state(run_path)
+        self.assertEqual(state["derived_vault_items"], [derived])
+        self.assertEqual(state["linked_vault_items"], [derived])
+        metadata, _ = load_item(self.data_root / "vault" / "items" / f"{derived}.md")
+        self.assertEqual(metadata["status"], "developing")
+
+    def test_validation_rejects_inconsistent_usage_and_unsafe_artifacts(self) -> None:
+        item_id = self.capture("Bad history")
+        path = self.data_root / "vault" / "items" / f"{item_id}.md"
+        metadata, body = load_item(path)
+        metadata["successful_runs"] = ["missing-run"]
+        metadata["use_count"] = -1
+        metadata["last_used_at"] = metadata["updated_at"]
+        metadata["final_artifacts"] = ["../outside.md"]
+        path.write_text(render_item(metadata, body), encoding="utf-8")
+        result, _, stderr = self.run_cli("vault", "validate")
+        self.assertEqual(result, 1)
+        self.assertIn("use_count must be a non-negative integer", stderr)
+        self.assertIn("successful_runs must also be present in related_runs", stderr)
+        self.assertIn("unsafe final artifact path", stderr)
 
     def test_no_capture_writes_into_public_framework_locations(self) -> None:
         before = {

@@ -141,14 +141,14 @@ DEFAULT_ARTIFACTS = {
 VAULT_RUN_FIELDS = (
     "origin_vault_items",
     "contributing_vault_items",
+    "derived_vault_items",
     "linked_vault_items",
 )
 VAULT_STATUS_TRANSITIONS = {
-    "inbox": {"ready", "developing", "archived"},
-    "ready": {"inbox", "developing", "archived"},
-    "developing": {"ready", "parked", "used", "archived"},
+    "inbox": {"ready", "developing", "parked", "archived"},
+    "ready": {"inbox", "developing", "parked", "archived"},
+    "developing": {"ready", "parked", "archived"},
     "parked": {"ready", "developing", "archived"},
-    "used": {"archived"},
     "archived": {"inbox"},
 }
 CREATOR_FILES = (
@@ -190,9 +190,9 @@ def require_creator_setup(data_root: Path) -> None:
         )
 
 
-def git_ignore_status(data_root: Path) -> tuple[Path | None, bool | None]:
-    """Return the surrounding Git root and whether it ignores data_root."""
-    probe = data_root
+def find_git_root(path: Path) -> Path | None:
+    """Return the nearest Git root at or above path."""
+    probe = path
     while not probe.exists() and probe != probe.parent:
         probe = probe.parent
     result = subprocess.run(
@@ -202,8 +202,22 @@ def git_ignore_status(data_root: Path) -> tuple[Path | None, bool | None]:
         text=True,
     )
     if result.returncode != 0:
+        return None
+    return Path(result.stdout.strip()).resolve()
+
+
+def git_ignore_status(data_root: Path) -> tuple[Path | None, bool | None]:
+    """Return the containing Git root and whether it ignores data_root.
+
+    If data_root is itself a Git repository, inspect its parent instead. The
+    data repository intentionally tracks its own contents; the relevant leak
+    check is whether a containing public repository ignores the whole root.
+    """
+    git_root = find_git_root(data_root)
+    if git_root == data_root.resolve():
+        git_root = find_git_root(data_root.parent)
+    if git_root is None:
         return None, None
-    git_root = Path(result.stdout.strip()).resolve()
     try:
         relative = data_root.relative_to(git_root)
     except ValueError:
@@ -232,7 +246,20 @@ def git_ignore_status(data_root: Path) -> tuple[Path | None, bool | None]:
 
 
 def git_safety_description(data_root: Path) -> str:
+    own_git_root = find_git_root(data_root)
     git_root, ignored = git_ignore_status(data_root)
+    if own_git_root == data_root.resolve():
+        if git_root is None:
+            return f"data root is Git repository {own_git_root}; no parent Git repository"
+        if ignored:
+            return (
+                f"data root is Git repository {own_git_root}; "
+                f"ignored by parent Git repository {git_root}"
+            )
+        return (
+            f"data root is Git repository {own_git_root}; "
+            f"NOT ignored by parent Git repository {git_root}"
+        )
     if git_root is None:
         return "outside a Git repository"
     if ignored:
@@ -280,6 +307,7 @@ def make_run(
     today: date | None = None,
     origin_vault_items: Sequence[str] = (),
     contributing_vault_items: Sequence[str] = (),
+    derived_vault_items: Sequence[str] = (),
 ) -> Path:
     if not title.strip():
         raise CFError("title must not be empty")
@@ -307,7 +335,10 @@ def make_run(
         "artifacts": dict(DEFAULT_ARTIFACTS),
         "origin_vault_items": list(origin_vault_items),
         "contributing_vault_items": list(contributing_vault_items),
-        "linked_vault_items": list(dict.fromkeys((*origin_vault_items, *contributing_vault_items))),
+        "derived_vault_items": list(derived_vault_items),
+        "linked_vault_items": list(
+            dict.fromkeys((*origin_vault_items, *contributing_vault_items, *derived_vault_items))
+        ),
         "parking_reason": None,
         "parked_at": None,
         "final_artifact": None,
@@ -441,13 +472,20 @@ def validation_errors(
         vault_lists[key] = value
     origins = vault_lists.get("origin_vault_items", [])
     contributors = vault_lists.get("contributing_vault_items", [])
+    derived = vault_lists.get("derived_vault_items", [])
     linked = vault_lists.get("linked_vault_items", [])
-    overlap = sorted(set(origins) & set(contributors))
+    overlap = sorted(
+        (set(origins) & set(contributors))
+        | (set(origins) & set(derived))
+        | (set(contributors) & set(derived))
+    )
     if overlap:
-        errors.append(f"vault items cannot be both origin and contributing: {', '.join(overlap)}")
-    expected_linked = list(dict.fromkeys((*origins, *contributors)))
+        errors.append(f"vault items cannot have more than one run role: {', '.join(overlap)}")
+    expected_linked = list(dict.fromkeys((*origins, *contributors, *derived)))
     if linked != expected_linked:
-        errors.append("linked_vault_items must equal origins followed by contributing items")
+        errors.append(
+            "linked_vault_items must equal origins followed by contributing and derived items"
+        )
     if status == "parked" and not linked:
         errors.append("parked status requires at least one linked vault item")
     if data_root is not None:
@@ -604,9 +642,9 @@ def cmd_new_run(args: argparse.Namespace, repository_root: Path) -> int:
     for item_id, role in requested_links:
         path = _resolve_valid_item(item_id, data_root)
         metadata, body = _load_valid_item(path)
-        if metadata["status"] in ("used", "archived"):
+        if metadata["status"] == "archived":
             raise CFError(
-                f"vault item '{metadata['id']}' has status '{metadata['status']}' and must be "
+                f"vault item '{metadata['id']}' is archived and must be "
                 "explicitly moved back into active consideration first"
             )
         records.append((path, metadata, body, role))
@@ -635,6 +673,8 @@ def cmd_new_run(args: argparse.Namespace, repository_root: Path) -> int:
                     "Potential content angles",
                     "Useful specifics or excerpts",
                     "Open questions",
+                    "Mining notes",
+                    "Development history",
                 )
                 if (text := section_text(body, section))
             )
@@ -643,6 +683,9 @@ def cmd_new_run(args: argparse.Namespace, repository_root: Path) -> int:
                 f"- Vault item: `{metadata['id']}`\n"
                 f"- Source: {source}\n"
                 f"- Prior status: {metadata['status']}\n\n"
+                f"- Previous related runs: {', '.join(metadata['related_runs']) or 'none'}\n"
+                f"- Previous final artifacts: {', '.join(metadata['final_artifacts']) or 'none'}\n"
+                f"- Successful uses: {metadata['use_count']}\n\n"
                 f"{useful or '_No developed body material recorded._'}"
             )
         (run_dir / "spike.md").write_text(
@@ -654,6 +697,9 @@ def cmd_new_run(args: argparse.Namespace, repository_root: Path) -> int:
             + "\n\n".join(source_blocks)
             + "\n\n## Known assumptions\n\n- Selection does not establish the creator's point of view.\n\n"
             "## Unresolved questions\n\n- What distinctive thesis should connect or develop this material?\n\n"
+            "## Reuse and duplication check\n\n"
+            "- Review prior runs, final artifacts, explored angles, and Mining notes above.\n"
+            "- Reuse is allowed; confirm that the new audience, angle, evidence, or format is distinct enough.\n\n"
             "## Confidentiality concerns\n\n_Not assessed; ask the human._\n",
             encoding="utf-8",
         )
@@ -744,6 +790,11 @@ def _capture_item(
         "tags": list(dict.fromkeys(tag.strip() for tag in tags if tag.strip())),
         "related_items": [],
         "related_runs": [],
+        "successful_runs": [],
+        "use_count": 0,
+        "derived_items": [],
+        "source_items": [],
+        "final_artifacts": [],
     }
     for key, value in (
         ("source_url", source_url),
@@ -801,13 +852,17 @@ def cmd_vault_list(args: argparse.Namespace, repository_root: Path) -> int:
             continue
         if args.tag and args.tag not in metadata["tags"]:
             continue
+        if args.successful == "yes" and metadata["use_count"] == 0:
+            continue
+        if args.successful == "no" and metadata["use_count"] > 0:
+            continue
         selected.append(metadata)
     selected.sort(key=lambda item: (item["updated_at"], item["id"]), reverse=True)
-    print("ID\tTITLE\tKIND\tSTATUS\tUPDATED")
+    print("ID\tTITLE\tKIND\tSTATUS\tSUCCESSFUL_USES\tUPDATED")
     for metadata in selected:
         print(
             f"{metadata['id']}\t{metadata['title']}\t{metadata['kind']}\t"
-            f"{metadata['status']}\t{metadata['updated_at'][:10]}"
+            f"{metadata['status']}\t{metadata['use_count']}\t{metadata['updated_at'][:10]}"
         )
     return 0
 
@@ -815,8 +870,19 @@ def cmd_vault_list(args: argparse.Namespace, repository_root: Path) -> int:
 def cmd_vault_show(args: argparse.Namespace, repository_root: Path) -> int:
     data_root = resolve_data_root(args.data_dir, repository_root)
     path = _resolve_valid_item(args.item, data_root)
-    _load_valid_item(path)
+    metadata, _ = _load_valid_item(path)
     print(f"path: {path}")
+    print(
+        "usage: "
+        f"{metadata['use_count']} successful use(s); "
+        f"last used {metadata.get('last_used_at') or 'never'}"
+    )
+    print(f"related_runs: {', '.join(metadata['related_runs']) or 'none'}")
+    print(f"successful_runs: {', '.join(metadata['successful_runs']) or 'none'}")
+    print(f"final_artifacts: {', '.join(metadata['final_artifacts']) or 'none'}")
+    print(f"source_items: {', '.join(metadata['source_items']) or 'none'}")
+    print(f"derived_items: {', '.join(metadata['derived_items']) or 'none'}")
+    print("--- canonical item ---")
     print(path.read_text(encoding="utf-8"), end="")
     return 0
 
@@ -851,6 +917,31 @@ def _load_run_for_data_root(value: str, data_root: Path) -> tuple[Path, dict[str
     return run_dir, load_state(run_dir)
 
 
+def _status_after_closing_run(
+    data_root: Path,
+    metadata: dict[str, Any],
+    closing_run_id: str,
+    *,
+    inactive_status: str,
+) -> str:
+    """Keep an item developing only while another unfinished linked run is active."""
+    for run_id in metadata["related_runs"]:
+        if run_id == closing_run_id:
+            continue
+        state_path = data_root / "runs" / run_id / "run.json"
+        if not state_path.is_file():
+            continue
+        try:
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            continue
+        if state.get("final_artifact"):
+            continue
+        if state.get("status") in ("active", "awaiting_human"):
+            return "developing"
+    return inactive_status
+
+
 def _link_item_and_run(
     data_root: Path,
     item_path: Path,
@@ -862,18 +953,30 @@ def _link_item_and_run(
 ) -> None:
     origin = list(state.get("origin_vault_items", []))
     contributing = list(state.get("contributing_vault_items", []))
-    target, other = (origin, contributing) if role == "origin" else (contributing, origin)
-    if metadata["id"] in other:
-        raise CFError(f"vault item is already linked to the run with role '{'contributing' if role == 'origin' else 'origin'}'")
+    derived = list(state.get("derived_vault_items", []))
+    roles = {"origin": origin, "contributing": contributing, "derived": derived}
+    target = roles[role]
+    other_roles = [name for name, values in roles.items() if name != role and metadata["id"] in values]
+    if other_roles:
+        raise CFError(
+            f"vault item is already linked to the run with role '{other_roles[0]}'"
+        )
     if metadata["id"] not in target:
         target.append(metadata["id"])
-    linked = list(dict.fromkeys((*origin, *contributing)))
+    linked = list(dict.fromkeys((*origin, *contributing, *derived)))
     state["origin_vault_items"] = origin
     state["contributing_vault_items"] = contributing
+    state["derived_vault_items"] = derived
     state["linked_vault_items"] = linked
     if run_dir.name not in metadata["related_runs"]:
         metadata["related_runs"].append(run_dir.name)
     stamp = utc_timestamp()
+    if metadata["status"] == "archived":
+        raise CFError(
+            f"vault item '{metadata['id']}' is archived and must be explicitly restored before linking"
+        )
+    if state.get("status") in ("active", "awaiting_human"):
+        metadata["status"] = "developing"
     metadata["updated_at"] = stamp
     body = append_section(
         body,
@@ -951,32 +1054,40 @@ def cmd_vault_park_run(args: argparse.Namespace, repository_root: Path) -> int:
         origins = [metadata["id"]]
         state["origin_vault_items"] = origins
         state["linked_vault_items"] = list(
-            dict.fromkeys((*origins, *state.get("contributing_vault_items", [])))
-        )
-        metadata["related_runs"].append(run_dir.name)
-        metadata["updated_at"] = stamp
-        body = append_section(body, "Development history", f"- {stamp}: created from parked run `{run_dir.name}`.")
-        if assessment:
-            body = append_section(body, "Parking notes", assessment)
-        write_item(path, metadata, body)
-    else:
-        for item_id in origins:
-            path = _resolve_valid_item(item_id, data_root)
-            metadata, body = _load_valid_item(path)
-            if run_dir.name not in metadata["related_runs"]:
-                metadata["related_runs"].append(run_dir.name)
-            metadata["status"] = "parked"
-            metadata["updated_at"] = stamp
-            body = append_section(
-                body,
-                "Development history",
-                f"- {stamp}: run `{run_dir.name}` was parked. Reason: {args.reason}",
+            dict.fromkeys(
+                (
+                    *origins,
+                    *state.get("contributing_vault_items", []),
+                    *state.get("derived_vault_items", []),
+                )
             )
-            parking_entry = f"### {stamp} — run `{run_dir.name}`\n\nReason: {args.reason}"
-            if assessment:
-                parking_entry += f"\n\n{assessment}"
-            body = append_section(body, "Parking notes", parking_entry)
-            write_item(path, metadata, body)
+        )
+    for item_id in state["linked_vault_items"]:
+        if not (data_root / "vault" / "items" / f"{item_id}.md").is_file():
+            continue
+        path = _resolve_valid_item(item_id, data_root)
+        metadata, body = _load_valid_item(path)
+        if run_dir.name not in metadata["related_runs"]:
+            metadata["related_runs"].append(run_dir.name)
+        if metadata["status"] != "archived":
+            role_is_parked = item_id in origins or item_id in state.get("derived_vault_items", [])
+            metadata["status"] = _status_after_closing_run(
+                data_root,
+                metadata,
+                run_dir.name,
+                inactive_status="parked" if role_is_parked else "ready",
+            )
+        metadata["updated_at"] = stamp
+        body = append_section(
+            body,
+            "Development history",
+            f"- {stamp}: run `{run_dir.name}` was parked. Reason: {args.reason}",
+        )
+        parking_entry = f"### {stamp} — run `{run_dir.name}`\n\nReason: {args.reason}"
+        if assessment:
+            parking_entry += f"\n\n{assessment}"
+        body = append_section(body, "Parking notes", parking_entry)
+        write_item(path, metadata, body)
     state["parked_from_status"] = state["status"]
     state["parked_from_pending_human_action"] = state["pending_human_action"]
     state["status"] = "parked"
@@ -1003,10 +1114,11 @@ def cmd_vault_resume_run(args: argparse.Namespace, repository_root: Path) -> int
     state["pending_human_action"] = restored_action
     state["resumed_at"] = utc_timestamp()
     stamp = state["resumed_at"]
-    for item_id in state.get("origin_vault_items", []):
+    for item_id in state.get("linked_vault_items", []):
         path = _resolve_valid_item(item_id, data_root)
         metadata, body = _load_valid_item(path)
-        metadata["status"] = "developing"
+        if metadata["status"] != "archived":
+            metadata["status"] = "developing"
         metadata["updated_at"] = stamp
         body = append_section(body, "Development history", f"- {stamp}: resumed run `{run_dir.name}`.")
         write_item(path, metadata, body)
@@ -1023,24 +1135,32 @@ def cmd_vault_finalize_run(args: argparse.Namespace, repository_root: Path) -> i
     if not isinstance(final_value, str) or not (run_dir / final_value).is_file():
         raise CFError("run does not have a valid final artifact")
     stamp = utc_timestamp()
-    origins = set(state.get("origin_vault_items", []))
+    artifact_reference = f"runs/{run_dir.name}/{final_value}"
     for item_id in state.get("linked_vault_items", []):
         path = _resolve_valid_item(item_id, data_root)
         metadata, body = _load_valid_item(path)
-        if item_id in origins and not args.keep_origin_status:
-            if metadata["status"] == "archived":
-                raise CFError(f"origin item '{item_id}' is archived; choose an explicit status before finalizing")
-            metadata["status"] = "used"
-        elif metadata["status"] == "developing":
-            # The completed development attempt is no longer active. Supporting sources
-            # and direct origins explicitly kept from "used" return to consideration.
-            metadata["status"] = "ready"
+        if run_dir.name not in metadata["related_runs"]:
+            metadata["related_runs"].append(run_dir.name)
+        new_success = run_dir.name not in metadata["successful_runs"]
+        if new_success:
+            metadata["successful_runs"].append(run_dir.name)
+        if artifact_reference not in metadata["final_artifacts"]:
+            metadata["final_artifacts"].append(artifact_reference)
+        metadata["use_count"] = len(metadata["successful_runs"])
+        if new_success:
+            metadata["last_used_at"] = stamp
+        if metadata["status"] != "archived":
+            metadata["status"] = _status_after_closing_run(
+                data_root, metadata, run_dir.name, inactive_status="ready"
+            )
         metadata["updated_at"] = stamp
-        body = append_section(
-            body,
-            "Development history",
-            f"- {stamp}: run `{run_dir.name}` produced final artifact `{final_value}`.",
-        )
+        if new_success:
+            body = append_section(
+                body,
+                "Development history",
+                f"- {stamp}: run `{run_dir.name}` produced final artifact `{artifact_reference}`; "
+                "the item remains available for reuse.",
+            )
         write_item(path, metadata, body)
     state["final_artifact"] = final_value
     _write_json(run_dir / "run.json", state)
@@ -1191,6 +1311,11 @@ def build_parser() -> argparse.ArgumentParser:
     vault_list.add_argument("--status", choices=VAULT_STATUSES)
     vault_list.add_argument("--kind", choices=VAULT_KINDS)
     vault_list.add_argument("--tag")
+    vault_list.add_argument(
+        "--successful",
+        choices=("yes", "no"),
+        help="filter by whether the item has prior successful completed uses",
+    )
     vault_list.add_argument("--data-dir", help="private data root (overrides CONTENT_FLOW_HOME)")
     vault_list.set_defaults(handler=cmd_vault_list)
 
@@ -1211,7 +1336,11 @@ def build_parser() -> argparse.ArgumentParser:
     link = vault_subparsers.add_parser("link-run", help="record a bidirectional item/run link")
     link.add_argument("item")
     link.add_argument("run")
-    link.add_argument("--role", choices=("origin", "contributing"), default="contributing")
+    link.add_argument(
+        "--role",
+        choices=("origin", "contributing", "derived"),
+        default="contributing",
+    )
     link.add_argument("--data-dir", help="private data root (overrides CONTENT_FLOW_HOME)")
     link.set_defaults(handler=cmd_vault_link_run)
 
@@ -1237,14 +1366,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     finalize = vault_subparsers.add_parser(
         "finalize-run",
-        help="record a final artifact and update linked vault items",
+        help="record successful usage and return reusable linked items to ready",
     )
     finalize.add_argument("run")
-    finalize.add_argument(
-        "--keep-origin-status",
-        action="store_true",
-        help="do not mark direct origins used (developing origins return to ready)",
-    )
     finalize.add_argument("--data-dir", help="private data root (overrides CONTENT_FLOW_HOME)")
     finalize.set_defaults(handler=cmd_vault_finalize_run)
     return parser

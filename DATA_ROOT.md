@@ -55,3 +55,8 @@ git commit -m "Capture Content Flow material"
 ```
 
 The parent Content Flow repository continues to ignore `.content-flow/`; the nested repository can use a separate private remote. Content Flow does not initialize Git, commit, stage files, create a submodule, or perform any other Git write automatically.
+
+When the data root is a nested Git repository, `bin/cf data-root` reports both facts:
+the data root tracks its private contents in its own repository, and the containing
+public repository ignores the entire data root. The root should not be ignored by its
+own repository.

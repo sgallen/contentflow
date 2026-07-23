@@ -13,9 +13,10 @@ After producing an artifact:
 
 Never delete an earlier artifact merely because a new version exists. When routing backward, preserve history and record the gap that caused the route.
 
-New runs also carry `origin_vault_items`, `contributing_vault_items`, and their ordered,
-duplicate-free union `linked_vault_items`. Use `bin/cf new-run`/`bin/cf vault link-run`
-rather than hand-editing relationships. A parked run has `status: parked`,
+New runs also carry `origin_vault_items`, `contributing_vault_items`,
+`derived_vault_items`, and their ordered, duplicate-free union `linked_vault_items`. Use
+`bin/cf new-run`/`bin/cf vault link-run` rather than hand-editing relationships. A parked
+run has `status: parked`,
 `pending_human_action: none`, a non-empty `parking_reason`, UTC `parked_at`, and at least
 one linked item. The parking command preserves pre-park status/action for resume.
 

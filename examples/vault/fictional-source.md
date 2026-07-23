@@ -1,5 +1,5 @@
 ---
-id: "2026-01-15-fictional-decision-notes"
+id: "fictional-source"
 title: "Fictional notes about decision latency"
 kind: "observation"
 status: "ready"
@@ -8,6 +8,11 @@ updated_at: "2026-01-16T09:30:00Z"
 tags: ["fictional", "decisions"]
 related_items: []
 related_runs: []
+successful_runs: []
+use_count: 0
+derived_items: []
+source_items: []
+final_artifacts: []
 ---
 
 ## Why this was saved
@@ -32,6 +37,10 @@ This fictional example distinguishes communication volume from decision clarity.
 ## Open questions
 
 - Which part of the delay came from ownership rather than missing information?
+
+## Mining notes
+
+- Model interpretation: other audiences or formats have not been assessed in this fictional example.
 
 ## Development history
 

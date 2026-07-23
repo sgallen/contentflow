@@ -59,6 +59,7 @@ A newly created run begins with this shape (legacy unlinked states may omit vaul
   "pending_human_action": "provide_idea_details",
   "origin_vault_items": [],
   "contributing_vault_items": [],
+  "derived_vault_items": [],
   "linked_vault_items": [],
   "parking_reason": null,
   "parked_at": null,
@@ -79,11 +80,13 @@ A newly created run begins with this shape (legacy unlinked states may omit vaul
 ```
 
 `origin_vault_items` identifies material whose selection directly initiated the run.
-`contributing_vault_items` identifies later or supporting material. `linked_vault_items` is
-their unique ordered union. Legacy states without these keys remain valid as unlinked runs.
-Every linked item reciprocally records the run ID. `parking_reason` and `parked_at` are
-required when status is `parked`; pre-park status/action fields support deterministic
-resume. `final_artifact` records the run-relative final path after vault final-linking.
+`contributing_vault_items` identifies supporting material, including completed-content
+provenance reused as input. `derived_vault_items` identifies ideas captured during the run.
+`linked_vault_items` is their unique ordered union. Legacy states without these keys remain
+valid as unlinked runs. Every linked item reciprocally records the run ID. `parking_reason`
+and `parked_at` are required when status is `parked`; pre-park status/action fields support
+deterministic resume. `final_artifact` records the run-relative final path after vault
+final-linking.
 
 Use `status: awaiting_human` with a specific pending action, `active` with `pending_human_action: none` while Codex can continue, and `complete` only with the terminal stage. A stage is advanced after its required output artifact is durably written; while a human gate is pending, keep the last valid artifact-backed stage and record the pending action.
 
@@ -110,13 +113,15 @@ overlaps existing work, or they simply do not want to finish now. Parking is not
 
 Before the mechanical transition, write `parking-assessment-NN.md` in the run with: what
 remains promising, strongest collected material, why work is stopping, what is missing,
-recommended next step, and whether to resume or reconsider from a new angle. Then use
+conditions that could make it worth revisiting, recommended next angle or action, and
+whether to resume or reconsider from a new angle. Then use
 `bin/cf vault park-run`. If origins exist, update them in place; otherwise create one
 `run-fragment`. Set run status `parked`, pending action `none`, link IDs, reason, and UTC
-timestamp. Preserve the whole run directory.
+timestamp. Preserve the whole run directory and all earlier successful-use history.
 
-`bin/cf vault resume-run` restores the pre-park status/gate and sets origins back to
-`developing`. Resume at the preserved stage after reading and validating disk state.
+`bin/cf vault resume-run` restores the pre-park status/gate and sets non-archived linked
+items back to `developing`. Resume at the preserved stage after reading and validating disk
+state.
 
 ## Stage 1: Selected idea
 
@@ -345,9 +350,16 @@ The approved draft, selected hook/closing, and remaining caveats.
 Create an immutable final copy, count its post body with `bin/cf count final.md --section "Approved post"`, and record selection, caveats, and approval. Do not publish.
 
 After writing and validating the final artifact, preserve all linked items and record the
-final path with `bin/cf vault finalize-run`. Direct origins become `used` unless the human
-chooses otherwise. Supporting contributors are not marked used; developing ones return to
-`ready`. No item is deleted.
+final path with `bin/cf vault finalize-run`. Record the run in each linked item's
+`successful_runs`, update `last_used_at`, preserve prior final paths, and count only
+successful completed uses. Non-archived origins, contributors, and derived ideas normally
+return to `ready`; another unfinished active run keeps them `developing`. Archived items
+remain archived. No item is consumed, exhausted, archived, or deleted by finalization.
+
+After finalization, Content Flow may ask whether the final piece should be independently
+discoverable as reusable content. It must not create a new vault item without human
+approval. Existing linked items already preserve the completed artifact and can contribute
+to a later run without copying the earlier run.
 
 ### Output artifact
 
