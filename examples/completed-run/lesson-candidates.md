@@ -1,6 +1,6 @@
 # Lesson candidates
 
-These proposals have **not** changed `creator/lessons.md`. On 2026-07-12, the fictional human completed the lesson gate without approving any candidate; the proposals remain evidence of learning considered but not accepted as persistent guidance.
+These proposals have **not** changed the fictional creator's private `lessons.md`. On 2026-07-12, the fictional human completed the lesson gate without approving any candidate; the proposals remain evidence of learning considered but not accepted as persistent guidance.
 
 ## 1. Prefer the creator's mechanism over business abstractions
 

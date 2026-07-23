@@ -149,7 +149,7 @@ Ask for confirmation when research could expose confidential information, materi
 
 ### Inputs
 
-`spike.md`, identified claims/questions, and permitted sources from `creator/sources.md` only if source preferences are relevant.
+`spike.md`, identified claims/questions, and permitted sources from `<data-root>/creator/sources.md` only if source preferences are relevant.
 
 ### Task
 
@@ -211,7 +211,7 @@ Every answer comes from the human. The human may decline a question or mark an a
 
 ### Inputs
 
-Load at this stage: `creator/profile.md`, `creator/voice.md`, `creator/lessons.md`, `creator/formats/linkedin.md`, the brief, interview, and current research. Do not load unrelated runs or vault files.
+Load at this stage: `<data-root>/creator/profile.md`, `voice.md`, `lessons.md`, `formats/linkedin.md`, the brief, interview, and current research. Do not load unrelated runs or vault files.
 
 ### Task
 
@@ -347,8 +347,8 @@ Candidates are evidence-linked and shown individually for approval.
 
 ### Possible routes
 
-Complete with no accepted lessons, or update `creator/lessons.md` only with individually approved candidates and then complete.
+Complete with no accepted lessons, or update `<data-root>/creator/lessons.md` only with individually approved candidates and then complete.
 
 ### Human gate
 
-Explicit item-level approval is required before persistent lessons change. Rejection or silence leaves `creator/lessons.md` untouched.
+Explicit item-level approval is required before persistent lessons change. Rejection or silence leaves `<data-root>/creator/lessons.md` untouched.

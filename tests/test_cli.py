@@ -3,6 +3,8 @@ from __future__ import annotations
 import contextlib
 import io
 import json
+import os
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -14,10 +16,15 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from content_flow.cli import (
+    CFError,
+    CREATOR_FILES,
     extract_markdown_section,
+    initialize_data_root,
     load_state,
     main,
     make_run,
+    missing_creator_files,
+    resolve_data_root,
     resolve_run,
     slugify,
     validation_errors,
@@ -55,6 +62,127 @@ class ContentFlowCLITests(unittest.TestCase):
     def test_bare_run_id_resolves_under_runs(self) -> None:
         run = make_run(self.root, "Resolvable", "linkedin", date(2026, 7, 22))
         self.assertEqual(resolve_run(run.name, self.root), run.resolve())
+
+    def test_data_root_precedence(self) -> None:
+        environment_root = self.root / "environment"
+        explicit_root = self.root / "explicit"
+        self.assertEqual(
+            resolve_data_root(str(explicit_root), ROOT, {"CONTENT_FLOW_HOME": str(environment_root)}),
+            explicit_root.resolve(),
+        )
+        self.assertEqual(
+            resolve_data_root(None, ROOT, {"CONTENT_FLOW_HOME": str(environment_root)}),
+            environment_root.resolve(),
+        )
+        self.assertEqual(resolve_data_root(None, ROOT, {}), (ROOT / ".content-flow").resolve())
+
+    def test_init_copies_templates_and_creates_private_structure(self) -> None:
+        data_root = self.root / "private"
+        initialize_data_root(data_root, ROOT)
+        self.assertEqual(missing_creator_files(data_root), [])
+        for relative in CREATOR_FILES:
+            self.assertEqual(
+                (data_root / "creator" / relative).read_text(encoding="utf-8"),
+                (ROOT / "templates" / "creator" / relative).read_text(encoding="utf-8"),
+            )
+        self.assertTrue((data_root / "vault" / "spikes").is_dir())
+        self.assertTrue((data_root / "runs").is_dir())
+
+    def test_init_refuses_to_overwrite_creator_files(self) -> None:
+        data_root = self.root / "private"
+        initialize_data_root(data_root, ROOT)
+        profile = data_root / "creator" / "profile.md"
+        profile.write_text("keep me", encoding="utf-8")
+        with self.assertRaisesRegex(CFError, "refusing to overwrite"):
+            initialize_data_root(data_root, ROOT)
+        self.assertEqual(profile.read_text(encoding="utf-8"), "keep me")
+
+    def test_init_fails_for_unignored_root_inside_git_repository(self) -> None:
+        repository = self.root / "repository"
+        repository.mkdir()
+        subprocess.run(["git", "init", "-q", str(repository)], check=True)
+        with self.assertRaisesRegex(CFError, "is not ignored"):
+            initialize_data_root(repository / "private-data", ROOT)
+
+    def test_init_rejects_tracked_root_even_if_ignore_rule_was_added_later(self) -> None:
+        repository = self.root / "repository"
+        data_root = repository / "private-data"
+        data_root.mkdir(parents=True)
+        (data_root / "tracked.txt").write_text("already tracked", encoding="utf-8")
+        subprocess.run(["git", "init", "-q", str(repository)], check=True)
+        subprocess.run(["git", "-C", str(repository), "add", "private-data/tracked.txt"], check=True)
+        (repository / ".gitignore").write_text("private-data/\n", encoding="utf-8")
+        with self.assertRaisesRegex(CFError, "is not ignored"):
+            initialize_data_root(data_root, ROOT)
+
+    def test_default_private_root_is_git_ignored(self) -> None:
+        result = subprocess.run(
+            ["git", "check-ignore", "-q", ".content-flow/.cf-ignore-probe"],
+            cwd=ROOT,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0)
+
+    def test_init_and_new_run_support_explicit_data_dir(self) -> None:
+        data_root = self.root / "explicit"
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            self.assertEqual(main(["init", "--data-dir", str(data_root)], root=ROOT), 0)
+            self.assertEqual(
+                main(
+                    [
+                        "new-run",
+                        "--title",
+                        "Explicit root",
+                        "--data-dir",
+                        str(data_root),
+                    ],
+                    root=ROOT,
+                ),
+                0,
+            )
+        run = next((data_root / "runs").iterdir())
+        self.assertTrue((run / "run.json").is_file())
+        self.assertIn(f"data_root: {data_root.resolve()}", output.getvalue())
+
+    def test_status_and_validate_use_explicit_data_dir_for_bare_id(self) -> None:
+        data_root = self.root / "explicit"
+        initialize_data_root(data_root, ROOT)
+        run = make_run(data_root, "Selected root", "linkedin", date(2026, 7, 22))
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            self.assertEqual(main(["status", run.name, "--data-dir", str(data_root)], root=ROOT), 0)
+            self.assertEqual(main(["validate", run.name, "--data-dir", str(data_root)], root=ROOT), 0)
+        self.assertIn(f"run_path: {run.resolve()}", output.getvalue())
+        self.assertIn(f"OK {run.resolve()}", output.getvalue())
+
+    def test_content_flow_home_selects_data_root(self) -> None:
+        data_root = self.root / "environment"
+        previous = os.environ.get("CONTENT_FLOW_HOME")
+        os.environ["CONTENT_FLOW_HOME"] = str(data_root)
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(main(["init"], root=ROOT), 0)
+                self.assertEqual(
+                    main(["new-run", "--title", "Environment root"], root=ROOT),
+                    0,
+                )
+        finally:
+            if previous is None:
+                os.environ.pop("CONTENT_FLOW_HOME", None)
+            else:
+                os.environ["CONTENT_FLOW_HOME"] = previous
+        self.assertEqual(len(list((data_root / "runs").iterdir())), 1)
+
+    def test_new_run_fails_clearly_before_private_setup(self) -> None:
+        stderr = io.StringIO()
+        with contextlib.redirect_stderr(stderr):
+            result = main(
+                ["new-run", "--title", "Not initialized", "--data-dir", str(self.root / "missing")],
+                root=ROOT,
+            )
+        self.assertEqual(result, 2)
+        self.assertIn("private creator setup is incomplete", stderr.getvalue())
 
     def test_validate_detects_missing_stage_artifact(self) -> None:
         run = make_run(self.root, "Missing brief", "linkedin", date(2026, 7, 22))

@@ -1,45 +1,48 @@
 # Architecture
 
+## Public framework and private state
+
+```text
+tracked framework repository                 selected private data root
+├── .agents/skills/                          ├── creator/
+├── src/content_flow/                        ├── vault/spikes/
+├── bin/cf                                   └── runs/<id>/
+├── templates/creator/
+├── examples/completed-run/  (fictional)
+├── tests/
+└── documentation
+```
+
+`DATA_ROOT.md` is the single documented definition of root selection and public/private classification. `bin/cf` implements it. Templates are public input to initialization, not live configuration. Content Flow never promotes a private artifact into `examples/` automatically.
+
 ## Procedure, state, and artifacts
 
-The **procedure** lives in `AGENTS.md`, `WORKFLOW.md`, and the two repository skills. It tells Codex how to reason and where humans must decide. **State** is the small `run.json` cursor in each run. It records the current stage, status, pending human action, research decision, revision round, and current/history artifact paths. **Artifacts** are named Markdown evidence of what happened: spike, research, interview, brief, drafts, reviews, final, and lesson candidates.
+The **procedure** lives in `AGENTS.md`, `WORKFLOW.md`, and the two repository skills. **State** is the small `run.json` cursor in each private run. **Artifacts** are Markdown evidence: spike, research, interview, brief, drafts, reviews, final, and lesson candidates.
 
-`run.json` aids resumption; it is not a workflow engine. An artifact holds substance while state points to it. Git versions both.
+`run.json` aids resumption; it is not a workflow engine. An artifact holds substance while state points to it. A private data root may be unversioned or separately versioned; the framework repository never needs to track it.
 
 ## Persistent and per-run context
 
-`creator/` holds approved, reusable context: profile, observed voice guidance, accepted lessons, source preferences, and format guidance. It changes deliberately and relatively slowly. `runs/<id>/` holds a single idea's context and decisions. Early stages avoid creator files; drafting loads only the creator files relevant to writing plus current run artifacts. This progressive disclosure reduces accidental cross-run assumptions.
+`<data-root>/creator/` holds approved reusable context. `<data-root>/runs/<id>/` holds one real idea's context and decisions. Early stages avoid creator files; drafting loads only relevant creator files and current-run artifacts. `<data-root>/vault/spikes/` may hold unselected real ideas. Selection records provenance in a run's `spike.md`.
 
-`vault/spikes/` may hold unselected ideas. Selection copies or distills an idea into a run's `spike.md`, preserving provenance.
-
-## Three kinds of responsibility
+## Responsibilities
 
 ### Model judgment
 
-Codex decides whether research is warranted, adapts interview questions to missing coverage, synthesizes drafts, applies the six Council lenses, diagnoses weak material, and proposes generalizable lessons. Ambiguous editorial choices stay visible as judgment rather than being hidden in code.
+Codex decides whether research is warranted, adapts interview questions to missing coverage, synthesizes drafts, applies Council lenses, diagnoses weak material, and proposes lessons. Ambiguous editorial choices stay visible as judgment.
 
 ### Deterministic mechanics
 
-The standard-library CLI creates collision-safe directories, writes initial state, validates enums and expected files, prevents unsafe artifact paths, reports state, and counts Unicode code points. These repeatable operations do not benefit from model discretion.
+The standard-library CLI resolves the data root, initializes private structure, checks Git-ignore safety, creates collision-safe runs, validates state and artifact paths, reports status, and counts Unicode code points.
 
 ### Human responsibility
 
-The human owns taste, personal claims, confidentiality, responsibility for factual assertions, Council authorization, revision approval, final approval, and acceptance of reusable lessons. The workflow stops at these boundaries instead of assuming consent.
+The human owns taste, personal claims, confidentiality, factual responsibility, Council authorization, revision approval, final approval, accepted lessons, and any deliberate publication or public-example copy.
 
 ## Why no workflow framework
 
-The graph is small, interactive, artifact-backed, and deliberately judgment-heavy. A state cursor, explicit contracts, filesystem checks, and Git provide enough reliability. A workflow framework would add deployment, serialization, operational, and debugging complexity without improving the key activity: a human and Codex reasoning over inspectable text.
+The graph is small, interactive, artifact-backed, and judgment-heavy. A state cursor, explicit contracts, filesystem checks, and optional private Git history provide enough reliability without deployment or orchestration infrastructure.
 
-Backward routes are normal rather than exceptional. A weak draft can return to interview for a missing example or to research for a shaky claim. Those choices need a reason in the artifact and a small state update, not orchestration infrastructure.
+## Portability
 
-## Portability and generalization
-
-The pattern generalizes to proposals, talks, decision memos, or case studies by replacing format guidance, stage references, and review lenses while retaining:
-
-1. a concise procedural skill;
-2. an explicit state cursor;
-3. named evidence artifacts;
-4. deterministic scaffolding and validation;
-5. human gates for taste, responsibility, and learning.
-
-Because skills are Markdown, assets are ordinary files, and tooling is Python standard library, the workflow can later be repackaged for another skill/plugin system without coupling domain logic to an API or server.
+Skills are Markdown, templates and artifacts are ordinary files, and tooling uses only the Python standard library. Different users select different private roots without modifying or forking public framework files.

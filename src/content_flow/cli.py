@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
+import shutil
+import subprocess
 import sys
 import unicodedata
 from datetime import date
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any, Mapping, Sequence
 
 
 STAGES = (
@@ -116,10 +119,118 @@ DEFAULT_ARTIFACTS = {
     "final": None,
     "lessons": None,
 }
+CREATOR_FILES = (
+    Path("profile.md"),
+    Path("voice.md"),
+    Path("lessons.md"),
+    Path("sources.md"),
+    Path("formats/linkedin.md"),
+)
 
 
 class CFError(Exception):
     """Expected user-facing CLI failure."""
+
+
+def resolve_data_root(
+    explicit: str | None,
+    repository_root: Path,
+    environ: Mapping[str, str] | None = None,
+) -> Path:
+    """Resolve the active private root using the documented precedence."""
+    environment = os.environ if environ is None else environ
+    selected = explicit or environment.get("CONTENT_FLOW_HOME") or str(repository_root / ".content-flow")
+    return Path(selected).expanduser().resolve()
+
+
+def missing_creator_files(data_root: Path) -> list[Path]:
+    creator_root = data_root / "creator"
+    return [creator_root / relative for relative in CREATOR_FILES if not (creator_root / relative).is_file()]
+
+
+def require_creator_setup(data_root: Path) -> None:
+    missing = missing_creator_files(data_root)
+    if missing:
+        rendered = ", ".join(str(path) for path in missing)
+        raise CFError(
+            f"private creator setup is incomplete under {data_root}; missing: {rendered}. "
+            "Run 'bin/cf init' with the same data-root selection."
+        )
+
+
+def git_ignore_status(data_root: Path) -> tuple[Path | None, bool | None]:
+    """Return the surrounding Git root and whether it ignores data_root."""
+    probe = data_root
+    while not probe.exists() and probe != probe.parent:
+        probe = probe.parent
+    result = subprocess.run(
+        ["git", "-C", str(probe), "rev-parse", "--show-toplevel"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return None, None
+    git_root = Path(result.stdout.strip()).resolve()
+    try:
+        relative = data_root.relative_to(git_root)
+    except ValueError:
+        return None, None
+    if not relative.parts:
+        return git_root, False
+    tracked = subprocess.run(
+        ["git", "-C", str(git_root), "ls-files", "--", relative.as_posix()],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if tracked.stdout.strip():
+        return git_root, False
+    candidates = (relative.as_posix(), (relative / ".cf-ignore-probe").as_posix())
+    for candidate in candidates:
+        ignored = subprocess.run(
+            ["git", "-C", str(git_root), "check-ignore", "--no-index", "-q", "--", candidate],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if ignored.returncode == 0:
+            return git_root, True
+    return git_root, False
+
+
+def git_safety_description(data_root: Path) -> str:
+    git_root, ignored = git_ignore_status(data_root)
+    if git_root is None:
+        return "outside a Git repository"
+    if ignored:
+        return f"ignored by Git repository {git_root}"
+    return f"NOT ignored by Git repository {git_root}"
+
+
+def initialize_data_root(data_root: Path, repository_root: Path) -> None:
+    git_root, ignored = git_ignore_status(data_root)
+    if git_root is not None and not ignored:
+        raise CFError(
+            f"selected data root {data_root} is inside Git repository {git_root} and is not ignored; "
+            "add an ignore rule before initializing private files"
+        )
+
+    template_root = repository_root / "templates" / "creator"
+    missing_templates = [template_root / relative for relative in CREATOR_FILES if not (template_root / relative).is_file()]
+    if missing_templates:
+        raise CFError(f"creator templates are incomplete: {', '.join(str(path) for path in missing_templates)}")
+
+    creator_root = data_root / "creator"
+    existing = [creator_root / relative for relative in CREATOR_FILES if (creator_root / relative).exists()]
+    if existing:
+        raise CFError(f"refusing to overwrite existing creator files: {', '.join(str(path) for path in existing)}")
+
+    (creator_root / "formats").mkdir(parents=True, exist_ok=True)
+    (data_root / "vault" / "spikes").mkdir(parents=True, exist_ok=True)
+    (data_root / "runs").mkdir(parents=True, exist_ok=True)
+    for relative in CREATOR_FILES:
+        shutil.copyfile(template_root / relative, creator_root / relative)
 
 
 def slugify(value: str) -> str:
@@ -337,22 +448,44 @@ def validation_errors(run_dir: Path, state: dict[str, Any]) -> list[str]:
     return errors
 
 
-def resolve_run(value: str, root: Path) -> Path:
+def resolve_run(value: str, data_root: Path) -> Path:
     path = Path(value).expanduser()
-    if not path.is_absolute() and not path.exists() and len(path.parts) == 1:
-        path = root / "runs" / path
+    if not path.is_absolute() and len(path.parts) == 1 and value not in {".", ".."}:
+        path = data_root / "runs" / path
     return path.resolve()
 
 
-def cmd_new_run(args: argparse.Namespace, root: Path) -> int:
-    run_dir = make_run(root, args.title, args.format)
-    print(run_dir.relative_to(root))
+def cmd_init(args: argparse.Namespace, repository_root: Path) -> int:
+    data_root = resolve_data_root(args.data_dir, repository_root)
+    initialize_data_root(data_root, repository_root)
+    print(f"data_root: {data_root}")
+    print(f"git_safety: {git_safety_description(data_root)}")
     return 0
 
 
-def cmd_status(args: argparse.Namespace, root: Path) -> int:
-    run_dir = resolve_run(args.run, root)
+def cmd_data_root(args: argparse.Namespace, repository_root: Path) -> int:
+    data_root = resolve_data_root(args.data_dir, repository_root)
+    print(f"data_root: {data_root}")
+    print(f"creator_setup: {'complete' if not missing_creator_files(data_root) else 'incomplete'}")
+    print(f"git_safety: {git_safety_description(data_root)}")
+    return 0
+
+
+def cmd_new_run(args: argparse.Namespace, repository_root: Path) -> int:
+    data_root = resolve_data_root(args.data_dir, repository_root)
+    require_creator_setup(data_root)
+    run_dir = make_run(data_root, args.title, args.format)
+    print(f"data_root: {data_root}")
+    print(f"run: {run_dir}")
+    return 0
+
+
+def cmd_status(args: argparse.Namespace, repository_root: Path) -> int:
+    data_root = resolve_data_root(args.data_dir, repository_root)
+    run_dir = resolve_run(args.run, data_root)
     state = load_state(run_dir)
+    print(f"data_root: {data_root}")
+    print(f"run_path: {run_dir}")
     print(f"run: {state.get('id', '<invalid>')}")
     print(f"title: {state.get('title', '<invalid>')}")
     print(f"stage: {state.get('stage', '<invalid>')}")
@@ -367,8 +500,9 @@ def cmd_status(args: argparse.Namespace, root: Path) -> int:
     return 0 if not errors else 1
 
 
-def cmd_validate(args: argparse.Namespace, root: Path) -> int:
-    run_dir = resolve_run(args.run, root)
+def cmd_validate(args: argparse.Namespace, repository_root: Path) -> int:
+    data_root = resolve_data_root(args.data_dir, repository_root)
+    run_dir = resolve_run(args.run, data_root)
     state = load_state(run_dir)
     errors = validation_errors(run_dir, state)
     if errors:
@@ -418,20 +552,35 @@ def extract_markdown_section(content: str, title: str) -> str:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="cf", description="Content Flow run mechanics")
+    parser = argparse.ArgumentParser(
+        prog="cf",
+        description="Content Flow run mechanics",
+        epilog="See DATA_ROOT.md for private data-root selection and safety policy.",
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
+
+    init = subparsers.add_parser("init", help="initialize the private data root from creator templates")
+    init.add_argument("--data-dir", help="private data root (overrides CONTENT_FLOW_HOME)")
+    init.set_defaults(handler=cmd_init)
+
+    data_root = subparsers.add_parser("data-root", help="report the resolved private data root")
+    data_root.add_argument("--data-dir", help="private data root (overrides CONTENT_FLOW_HOME)")
+    data_root.set_defaults(handler=cmd_data_root)
 
     new_run = subparsers.add_parser("new-run", help="create a new run without overwriting")
     new_run.add_argument("--title", required=True)
     new_run.add_argument("--format", default="linkedin")
+    new_run.add_argument("--data-dir", help="private data root (overrides CONTENT_FLOW_HOME)")
     new_run.set_defaults(handler=cmd_new_run)
 
     status = subparsers.add_parser("status", help="show run state and validation summary")
     status.add_argument("run")
+    status.add_argument("--data-dir", help="private data root (overrides CONTENT_FLOW_HOME)")
     status.set_defaults(handler=cmd_status)
 
     validate = subparsers.add_parser("validate", help="validate run state and artifacts")
     validate.add_argument("run")
+    validate.add_argument("--data-dir", help="private data root (overrides CONTENT_FLOW_HOME)")
     validate.set_defaults(handler=cmd_validate)
 
     count = subparsers.add_parser("count", help="count Unicode code points in a UTF-8 file")

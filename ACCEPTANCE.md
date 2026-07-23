@@ -2,14 +2,20 @@
 
 Run commands from the repository root.
 
+## Public/private boundary
+
+- [ ] The tracked repository contains reusable skills, tooling, documentation, tests, blank templates, and fictional examples only.
+- [ ] `templates/creator/` contains every required starter; no tracked `creator/`, `vault/`, or `runs/` directory acts as live data.
+- [ ] `.content-flow/` is ignored and `bin/cf init` confirms Git safety before writing private files.
+- [ ] `DATA_ROOT.md` defines CLI option, environment, and default precedence once; other files reference it.
+- [ ] No automatic path copies private work into `examples/`, and creator source guidance warns against secrets.
+
 ## Skills and procedure
 
-- [ ] `.agents/skills/content-flow-setup/SKILL.md` has valid frontmatter and onboarding resources.
-- [ ] `.agents/skills/content-flow/SKILL.md` has valid frontmatter and supports new, resume, status, and semantic transition intents.
-- [ ] `WORKFLOW.md` contains all nine stage contracts with entry, inputs, task, artifact, exit, routes, and human gate headings.
-- [ ] The documented flow makes research conditional and routes weak drafts backward.
-- [ ] The interview requires one question at a time and coverage-based completion.
-- [ ] Council, revision application, finalization, and persistent lesson changes have explicit human gates.
+- [ ] Both skills have valid frontmatter and use `bin/cf` to resolve the private root.
+- [ ] Setup reports intended private creator paths and never modifies templates.
+- [ ] Orchestration reports the root, fails clearly before private setup, and stores real vault/run artifacts only under it.
+- [ ] Research remains conditional; interview, Council, revision, finalization, and lessons retain human gates.
 
 Verify skills:
 
@@ -20,24 +26,23 @@ python3 /home/barney/.codex/skills/.system/skill-creator/scripts/quick_validate.
 
 ## CLI and state
 
-- [ ] `bin/cf new-run --title "Acceptance smoke" --format linkedin` creates `runs/<date>-acceptance-smoke` and never overwrites a collision.
-- [ ] The created run contains `run.json` and `spike.md` and passes validation.
-- [ ] `status` reports stage, status, research decision, revision round, pending action, and artifact filenames.
-- [ ] `validate` rejects invalid enums, stage/action inconsistency, revision-limit violations, unsafe paths (including symlinks), missing files, bad artifact names, and missing stage artifacts.
-- [ ] `count` reports Unicode code points for a whole file or one exact Markdown section without network access.
+- [ ] `bin/cf init` creates creator files, `vault/spikes/`, and `runs/` without overwriting.
+- [ ] `--data-dir`, `CONTENT_FLOW_HOME`, and the repository-local default follow documented precedence.
+- [ ] Bare run IDs resolve under the active root's `runs/`; explicit paths remain supported.
+- [ ] `status` reports the active root and run state.
+- [ ] `validate` retains enum, gate, revision, filename, presence, and path/symlink checks.
+- [ ] `count` remains deterministic and offline.
 
-Automated verification:
+## Verification
 
 ```bash
 python3 -m unittest discover -s tests -v
+bin/cf init
 bin/cf validate examples/completed-run
+bin/cf status examples/completed-run
+bin/cf --help
+git check-ignore .content-flow
+git diff --check
 ```
 
-## Vertical slice and boundaries
-
-- [ ] `examples/completed-run/` contains a conditional research decision, research report, four-question adaptive interview, content brief, multi-option first draft, below-threshold Council review, approved plan, second draft, second review, approved final, and at most five pending lessons.
-- [ ] Every example artifact is named in its valid `run.json`.
-- [ ] No code imports non-standard-library packages.
-- [ ] A repository search finds no implementation of OpenClaw, connectors, OpenAI API calls, LangGraph, Temporal, vector databases, a web UI, background work, autonomous publishing, or multi-agent infrastructure.
-- [ ] `creator/lessons.md` does not contain unapproved example lessons.
-- [ ] `ARCHITECTURE.md` explains procedure/state/artifacts, context scopes, responsibility boundaries, framework avoidance, and portability.
+Also initialize a temporary explicit directory and a temporary `CONTENT_FLOW_HOME`. Confirm the fictional completed example remains valid and `.content-flow/` is neither tracked nor staged.

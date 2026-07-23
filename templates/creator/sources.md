@@ -15,3 +15,4 @@ None supplied yet.
 
 No creator-specific exclusions are established. Never submit confidential material to an external search or service without explicit permission.
 
+Store source policies and non-secret references here. Never store credentials, API keys, cookies, or authentication tokens in this file.
