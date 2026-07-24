@@ -16,7 +16,12 @@ The selected path expands `~` and is resolved to an absolute path. Relative CLI 
 
 Public and shareable framework material includes skills, playbooks, rubrics, workflow contracts, CLI code, schemas and validation, blank creator templates, tests, general documentation, and explicitly fictional completed examples.
 
-Private by default material includes the active creator profile, voice guide, approved lessons, source configuration, real spikes, research reports, interview transcripts, drafts, final posts, run state, and workflow retrospectives. Publishing a post does not make its working files public. A human may deliberately create a sanitized fictional/public example later, but Content Flow never copies private work into `examples/` automatically.
+Private by default material includes the active creator profile, voice guide, approved
+lessons, source and format configuration, real spikes, repository inspections, research
+reports, interview transcripts, drafts, final content, run state, and workflow
+retrospectives. Applying an approved README or publishing a post does not make its working
+files public. A human may deliberately create a sanitized fictional/public example later,
+but Content Flow never copies private work into `examples/` automatically.
 
 The private layout is:
 
@@ -27,7 +32,9 @@ The private layout is:
 │   ├── voice.md
 │   ├── lessons.md
 │   ├── sources.md
-│   └── formats/linkedin.md
+│   └── formats/
+│       ├── linkedin.md
+│       └── readme.md
 ├── vault/
 │   ├── items/
 │   ├── assets/
@@ -35,7 +42,11 @@ The private layout is:
 └── runs/
 ```
 
-Initialize it with `bin/cf init`. Initialization copies tracked starter files from `templates/creator/`, refuses to overwrite any existing creator file, and refuses to create private files inside a surrounding Git repository unless the selected root is ignored. The default `.content-flow/` path is ignored by this repository.
+Initialize it with `bin/cf init`. Initialization copies missing tracked starter files from
+`templates/creator/` and never overwrites an existing private creator file. This lets an
+older initialized root receive a newly supported format safely. Initialization refuses to
+create private files inside a surrounding Git repository unless the selected root is
+ignored. The default `.content-flow/` path is ignored by this repository.
 
 `vault/items/*.md` are canonical, independently readable records. `vault/assets/<item-id>/`
 is optional supporting material, created only when useful material is actually available.

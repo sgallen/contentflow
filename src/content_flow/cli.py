@@ -47,6 +47,7 @@ STAGES = (
     "complete",
 )
 STATUSES = ("active", "awaiting_human", "parked", "complete")
+SUPPORTED_FORMATS = ("linkedin", "readme")
 PENDING_ACTIONS = (
     "provide_idea_details",
     "confirm_research_decision",
@@ -158,6 +159,7 @@ CREATOR_FILES = (
     Path("lessons.md"),
     Path("sources.md"),
     Path("formats/linkedin.md"),
+    Path("formats/readme.md"),
 )
 
 
@@ -282,16 +284,19 @@ def initialize_data_root(data_root: Path, repository_root: Path) -> None:
         raise CFError(f"creator templates are incomplete: {', '.join(str(path) for path in missing_templates)}")
 
     creator_root = data_root / "creator"
-    existing = [creator_root / relative for relative in CREATOR_FILES if (creator_root / relative).exists()]
-    if existing:
+    missing = [relative for relative in CREATOR_FILES if not (creator_root / relative).exists()]
+    if not missing:
+        existing = [creator_root / relative for relative in CREATOR_FILES]
         raise CFError(f"refusing to overwrite existing creator files: {', '.join(str(path) for path in existing)}")
 
     (creator_root / "formats").mkdir(parents=True, exist_ok=True)
     ensure_vault_dirs(data_root)
     (data_root / "runs").mkdir(parents=True, exist_ok=True)
-    for relative in CREATOR_FILES:
+    for relative in missing:
         shutil.copyfile(template_root / relative, creator_root / relative)
-    (data_root / "vault" / "index.md").write_text(build_index([]), encoding="utf-8")
+    index_path = data_root / "vault" / "index.md"
+    if not index_path.exists():
+        index_path.write_text(build_index([]), encoding="utf-8")
 
 
 def slugify(value: str) -> str:
@@ -312,8 +317,8 @@ def make_run(
 ) -> Path:
     if not title.strip():
         raise CFError("title must not be empty")
-    if format_name != "linkedin":
-        raise CFError("unsupported format; v0 supports only 'linkedin'")
+    if format_name not in SUPPORTED_FORMATS:
+        raise CFError(f"unsupported format; choose one of: {', '.join(SUPPORTED_FORMATS)}")
     runs = root / "runs"
     runs.mkdir(parents=True, exist_ok=True)
     base = f"{(today or date.today()).isoformat()}-{slugify(title)}"
@@ -345,16 +350,34 @@ def make_run(
         "final_artifact": None,
     }
     _write_json(run_dir / "run.json", state)
-    (run_dir / "spike.md").write_text(
-        f"# {title.strip()}\n\n"
-        "## Idea\n\n_To be supplied._\n\n"
-        "## Why it may be worth developing\n\n_Unknown._\n\n"
-        "## Original source or provenance\n\n_Unknown._\n\n"
-        "## Known assumptions\n\n- None recorded yet.\n\n"
-        "## Unresolved questions\n\n- What is the precise idea?\n\n"
-        "## Confidentiality concerns\n\n_Not assessed; ask the human._\n",
-        encoding="utf-8",
-    )
+    if format_name == "readme":
+        spike = (
+            f"# {title.strip()}\n\n"
+            "## Target project and README\n\n"
+            "_Inspect and record the exact project root and target README path._\n\n"
+            "## Project purpose\n\n_Unknown until repository inspection and owner input._\n\n"
+            "## Repository evidence\n\n"
+            "_Inspect source, directory structure, documentation, CLI help, tests, examples, "
+            "and package metadata as relevant._\n\n"
+            "## Documentation claims\n\n_Not assessed yet._\n\n"
+            "## Owner intent\n\n_Not established yet._\n\n"
+            "## Known assumptions\n\n- None recorded yet.\n\n"
+            "## Unresolved questions\n\n"
+            "- Who is the primary reader and what should they do first?\n\n"
+            "## Confidentiality concerns\n\n"
+            "_Assess the public/private boundary before recording repository material._\n"
+        )
+    else:
+        spike = (
+            f"# {title.strip()}\n\n"
+            "## Idea\n\n_To be supplied._\n\n"
+            "## Why it may be worth developing\n\n_Unknown._\n\n"
+            "## Original source or provenance\n\n_Unknown._\n\n"
+            "## Known assumptions\n\n- None recorded yet.\n\n"
+            "## Unresolved questions\n\n- What is the precise idea?\n\n"
+            "## Confidentiality concerns\n\n_Not assessed; ask the human._\n"
+        )
+    (run_dir / "spike.md").write_text(spike, encoding="utf-8")
     return run_dir
 
 
@@ -400,8 +423,8 @@ def validation_errors(
         errors.append("id must match the run directory name")
     if not isinstance(state.get("title"), str) or not state.get("title", "").strip():
         errors.append("title must be a non-empty string")
-    if state.get("format") != "linkedin":
-        errors.append("format must be 'linkedin' in v0")
+    if state.get("format") not in SUPPORTED_FORMATS:
+        errors.append(f"format must be one of: {', '.join(SUPPORTED_FORMATS)}")
     if stage not in STAGES:
         errors.append(f"stage must be one of: {', '.join(STAGES)}")
     if status not in STATUSES:
@@ -1178,6 +1201,7 @@ def cmd_status(args: argparse.Namespace, repository_root: Path) -> int:
     print(f"run_path: {run_dir}")
     print(f"run: {state.get('id', '<invalid>')}")
     print(f"title: {state.get('title', '<invalid>')}")
+    print(f"format: {state.get('format', '<invalid>')}")
     print(f"stage: {state.get('stage', '<invalid>')}")
     print(f"status: {state.get('status', '<invalid>')}")
     print(f"research_required: {json.dumps(state.get('research_required'))}")
@@ -1263,7 +1287,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     new_run = subparsers.add_parser("new-run", help="create a new run without overwriting")
     new_run.add_argument("--title")
-    new_run.add_argument("--format", default="linkedin")
+    new_run.add_argument("--format", choices=SUPPORTED_FORMATS, default="linkedin")
     new_run.add_argument(
         "--vault-item",
         action="append",

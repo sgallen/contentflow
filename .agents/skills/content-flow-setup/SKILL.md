@@ -1,6 +1,6 @@
 ---
 name: content-flow-setup
-description: Initialize or improve private Content Flow creator context, voice guidance, approved lessons, source preferences, and LinkedIn format guidance. Use when onboarding a creator, selecting a Content Flow data root, analyzing supplied writing samples, or proposing evidence-based creator-context updates.
+description: Initialize or improve private Content Flow creator context, voice guidance, approved lessons, source preferences, and format guidance. Use when onboarding a creator, selecting a Content Flow data root, analyzing supplied writing samples, or proposing evidence-based creator-context updates.
 ---
 
 # Content Flow Setup
@@ -15,7 +15,7 @@ Build useful creator context without inventing preferences.
    vault retains reusable sources, ideas, completed-artifact provenance, and parked runs;
    successful use is history rather than consumption. Do not turn setup into a vault
    questionnaire.
-2. Before any edit, list the exact paths under `<data-root>/creator` that you intend to modify. Inspect `profile.md`, `voice.md`, `lessons.md`, `sources.md`, and `formats/linkedin.md`; summarize populated, missing, uncertain, and conflicting fields.
+2. Before any edit, list the exact paths under `<data-root>/creator` that you intend to modify. Inspect `profile.md`, `voice.md`, `lessons.md`, `sources.md`, `formats/linkedin.md`, and `formats/readme.md`; summarize populated, missing, uncertain, and conflicting fields.
 3. Read [references/onboarding-questions.md](references/onboarding-questions.md). Ask one focused question at a time, prioritizing gaps that materially affect writing. Do not require every question.
 4. If samples are supplied, confirm they are the creator's and whether they are representative. Analyze repeated textual evidence using [references/sample-analysis.md](references/sample-analysis.md). Separate:
    - **Observed:** supported by quoted or precisely located sample evidence.
@@ -33,6 +33,7 @@ Build useful creator context without inventing preferences.
 - `lessons.md`: only individually human-approved reusable lessons, with provenance.
 - `sources.md`: permitted/preferred source types, trusted recurring sources, citation and confidentiality rules. This is not a list of invented authorities.
 - `formats/linkedin.md`: format-specific constraints and creator-approved preferences.
+- `formats/readme.md`: reusable README constraints and any creator-approved README preferences.
 
 Use [assets/creator-starter.md](assets/creator-starter.md) as a structural fallback, not content to copy blindly. Do not modify run artifacts during setup unless explicitly asked.
 

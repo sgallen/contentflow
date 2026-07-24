@@ -1,6 +1,10 @@
 # Content Flow v0
 
-Content Flow is a reusable, local-first Codex framework for turning a selected idea into a human-approved LinkedIn post. The tracked repository contains workflow instructions, deterministic tooling, blank templates, tests, and fictional examples. Active creator context and real work stay in an ignored private data root.
+Content Flow is a reusable, local-first Codex framework for developing human-approved
+content. Its initial formats are LinkedIn posts and project READMEs. The tracked repository
+contains workflow instructions, deterministic tooling, blank templates, tests, and
+fictional examples. Active creator context and real work stay in an ignored private data
+root.
 
 It is intentionally **not** an agent service, web app, publishing system, workflow server, or OpenAI API integration. It has no connectors, background jobs, vector database, or multi-agent runtime.
 
@@ -20,7 +24,10 @@ The default private root is `<repository>/.content-flow`:
 bin/cf init
 ```
 
-Initialization reports the exact absolute root and confirms Git-ignore status. It copies blank tracked starters from `templates/creator/`, creates `vault/items/`, `vault/assets/`, generated `vault/index.md`, and `runs/`, and never overwrites existing creator files.
+Initialization reports the exact absolute root and confirms Git-ignore status. It copies
+missing blank tracked starters from `templates/creator/`, creates `vault/items/`,
+`vault/assets/`, generated `vault/index.md`, and `runs/`, and never overwrites existing
+creator files.
 
 Select another private root either per command or through the environment:
 
@@ -70,6 +77,7 @@ changes status automatically.
 
 ```bash
 bin/cf new-run --title "Why small teams need decision logs" --format linkedin
+bin/cf new-run --title "Improve the project README" --format readme
 bin/cf new-run --vault-item <item-id>
 bin/cf new-run --vault-item <origin-id> --contributing-vault-item <source-id>
 ```
@@ -88,6 +96,13 @@ Real spikes and runs are written only under the active private root. `examples/`
 
 Selecting a vault item changes it to `developing`, links both sides, and preserves item
 provenance in `spike.md`. Multiple items may contribute to one run.
+
+A README run uses the same research decision, adaptive one-question-at-a-time interview,
+content brief, draft, authorized Council review, approved revision, final approval, and
+lesson proposal stages. It inspects the target repository and existing README as source
+material, separating repository-proven behavior, documentation claims, owner intent, and
+uncertainty. Drafts remain private. Content Flow changes the exact target README only after
+showing the final content or diff and receiving explicit approval, and it never commits.
 
 ## Park, resume, and complete linked work
 

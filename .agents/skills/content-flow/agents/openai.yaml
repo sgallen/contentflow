@@ -1,4 +1,4 @@
 interface:
   display_name: "Content Flow"
   short_description: "Guide a content idea through an approved writing workflow"
-  default_prompt: "Start or resume a content workflow for a LinkedIn post, using repository artifacts and human approval gates."
+  default_prompt: "Start or resume a LinkedIn or README content workflow using private run artifacts and human approval gates."

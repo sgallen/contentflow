@@ -16,6 +16,9 @@ This repository is a local-first personal content workflow. Codex is the interac
 10. Never edit `<data-root>/creator/lessons.md` from lesson candidates without explicit, item-level human approval. Preserve all previously approved lessons unless their removal is separately approved.
 11. Update `run.json` atomically after writing each meaningful artifact, then run `bin/cf validate <run>`.
 12. Keep subjective claims labeled as observations, creator statements, proposals, or assumptions. Scores are diagnostic, not truth.
+13. For a README run, keep proposed content private until the exact target path and final
+    content or diff have been shown. Update only that README after explicit final approval,
+    and never commit automatically.
 
 ## Repository hygiene
 

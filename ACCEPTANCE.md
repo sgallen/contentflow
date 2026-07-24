@@ -17,6 +17,11 @@ Run commands from the repository root.
 - [ ] Orchestration reports the root, fails clearly before private setup, and stores real vault/run artifacts only under it.
 - [ ] Research remains conditional; interview, Council, revision, finalization, and lessons retain human gates.
 - [ ] Natural-language quick/enriched capture, vault selection, parking, resume, and linked finalization preserve their documented gates and provenance.
+- [ ] LinkedIn and README use one workflow and artifact model; README adds repository
+  inspection, adaptive interviewing, format-specific briefing/drafting, and the six
+  specified Council lenses without a separate agent or engine.
+- [ ] README Council and revision remain human-triggered, and no target README changes
+  before explicit approval of the shown final candidate.
 
 Verify skills:
 
@@ -27,12 +32,16 @@ python3 /home/barney/.codex/skills/.system/skill-creator/scripts/quick_validate.
 
 ## CLI and state
 
-- [ ] `bin/cf init` creates creator files, `vault/items/`, `vault/assets/`, generated `vault/index.md`, and `runs/` without overwriting.
+- [ ] `bin/cf init` creates both creator format files, `vault/items/`, `vault/assets/`,
+  generated `vault/index.md`, and `runs/` without overwriting; it can add a missing README
+  format to an older private root.
 - [ ] `--data-dir`, `CONTENT_FLOW_HOME`, and the repository-local default follow documented precedence.
 - [ ] Bare run IDs resolve under the active root's `runs/`; explicit paths remain supported.
 - [ ] `status` reports the active root and run state.
 - [ ] `validate` retains enum, gate, revision, filename, presence, and path/symlink checks.
 - [ ] `count` remains deterministic and offline.
+- [ ] `new-run --format readme`, status, validation, and resume mechanics work while
+  existing LinkedIn behavior remains valid.
 - [ ] Vault capture/show/list/update/rebuild/validate work under every data-root selector.
 - [ ] One or more vault items can start a run; run and item state link bidirectionally.
 - [ ] Parking preserves history and updates origins or creates one run-fragment; resume restores state; final linkage records successful usage and returns reusable items to ready.

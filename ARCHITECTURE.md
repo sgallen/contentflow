@@ -24,6 +24,11 @@ The **procedure** lives in `AGENTS.md`, `WORKFLOW.md`, and the two repository sk
 
 `run.json` aids resumption; it is not a workflow engine. An artifact holds substance while state points to it. A private data root may be unversioned or separately versioned; the framework repository never needs to track it.
 
+The `format` field selects reusable guidance without selecting a different engine.
+`linkedin` and `readme` share the same state and artifacts. The active
+`creator/formats/<format>.md` specializes inspection, briefing, drafting, Council lenses,
+and final handling.
+
 The **vault** is persistent intake and incubation: material may exist without a run and may
 survive several development attempts. A **run** is one bounded attempt to develop selected
 material. **Final content** is the human-approved artifact within a run; finalization never
@@ -56,10 +61,15 @@ The standard-library CLI resolves the data root, initializes private structure, 
 Git-ignore safety, creates collision-safe vault items and runs, maintains bidirectional
 relationships and the generated index, parks/resumes run state, validates paths and state,
 reports status, and counts Unicode code points. It does not summarize or score ideas.
+README repository inspection, adaptive interviewing, drafting, review, and approval remain
+Codex procedure rather than new CLI subcommands.
 
 ### Human responsibility
 
-The human owns taste, personal claims, confidentiality, factual responsibility, Council authorization, revision approval, final approval, accepted lessons, and any deliberate publication or public-example copy.
+The human owns taste, personal claims, confidentiality, factual responsibility, Council
+authorization, revision approval, final approval, accepted lessons, and any deliberate
+publication or public-example copy. For README runs, only explicit approval of the shown
+final candidate authorizes updating the exact target README; Content Flow never commits it.
 
 ## Why no workflow framework
 
@@ -67,7 +77,10 @@ The graph is small, interactive, artifact-backed, and judgment-heavy. A state cu
 
 ## Portability
 
-Skills are Markdown, templates and artifacts are ordinary files, and tooling uses only the Python standard library. Different users select different private roots without modifying or forking public framework files.
+Skills are Markdown, templates and artifacts are ordinary files, and tooling uses only the
+Python standard library. A README run can inspect any locally available repository while
+keeping its run artifacts in the selected Content Flow data root. Different users select
+different private roots without modifying or forking public framework files.
 
 ## Future Oracle compatibility
 

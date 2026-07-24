@@ -1,5 +1,30 @@
 # Implementation Plan
 
+## Reusable README content format
+
+- Extend the existing `format` field from LinkedIn-only validation to the closed set
+  `linkedin` and `readme`; retain the same run state, stages, artifact filenames, vault
+  relationships, revision limit, and human gates.
+- Add a public generic README format starter and let initialization add any missing creator
+  starters without overwriting existing private files. This also upgrades an older private
+  root by adding only `creator/formats/readme.md`.
+- Specialize orchestration by format: a README run inspects repository evidence first,
+  interviews adaptively, creates a README-specific brief and proposed README, and uses the
+  specified six Council lenses only after authorization.
+- Keep drafts and reviews in the private run. Treat revision approval as approval only for
+  the pending plan. Before changing the target README, show the exact path and final
+  content or diff, then require explicit final approval; change no other target file and
+  never commit.
+- Update workflow, architecture, data-root, setup, acceptance, and concise root
+  documentation in place. Do not rewrite the root README or add an application, service,
+  connector, workflow engine, or agent infrastructure.
+- Add offline deterministic tests for initialization and upgrade safety, README run
+  creation/status/validation/resume shape, Council and revision gates, target-file
+  non-modification, tracked/private boundaries, and unchanged LinkedIn behavior.
+- Run the full unit suite, validate both skills, exercise a temporary private root, inspect
+  CLI help, run `git diff --check`, and confirm no temporary or private artifact is tracked
+  or staged.
+
 ## Focused vault reuse and lineage refinement
 
 - Keep canonical vault items as Markdown under the active private data root and keep

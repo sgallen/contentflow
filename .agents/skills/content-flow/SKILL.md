@@ -10,7 +10,7 @@ Act as one capable orchestrator. Council and interviewer personas are functional
 ## Start, resume, or report
 
 1. Run `bin/cf data-root` (or pass the user's `--data-dir` selection) and report the exact active data root. `DATA_ROOT.md` defines the canonical selection; do not reimplement it. If creator setup is incomplete, stop and direct the human to `$content-flow-setup` or `bin/cf init`.
-2. For a new run from supplied material, run `bin/cf new-run --title "..." --format linkedin` with the same data-root selection; report its path. Fill its `spike.md` from the supplied idea without inventing missing provenance, assumptions, or confidentiality facts. For vault origins use the vault procedure below instead.
+2. For a new run from supplied material, run `bin/cf new-run --title "..." --format <linkedin|readme>` with the same data-root selection; report its path. Fill its `spike.md` from the supplied idea or inspected project without inventing missing provenance, assumptions, capabilities, or confidentiality facts. For vault origins use the vault procedure below instead.
 3. For an existing run, read `<run>/run.json`, then read only artifacts relevant to its stage. Run `bin/cf validate <run>` with the same selection before advancing. A bare run ID belongs under `<data-root>/runs/`; an explicit path may identify a fictional example. Treat disk state, not chat memory, as authoritative.
 4. For status intent, run `bin/cf status <run>`, summarize the current artifact/state, pending human action, and valid next routes. Do not advance.
 5. Read `WORKFLOW.md` for the active stage contract. Read [references/state-and-artifacts.md](references/state-and-artifacts.md) when creating/updating state, and [references/artifact-templates.md](references/artifact-templates.md) when starting an artifact.
@@ -54,7 +54,8 @@ require exact phrases.
    ask for confirmation. Prior success never blocks reuse.
 2. Create through the normal deterministic mechanism:
    `bin/cf new-run --vault-item <origin-id>`; repeat `--vault-item` for multiple direct
-   origins and use repeated `--contributing-vault-item` for supporting items.
+   origins and use repeated `--contributing-vault-item` for supporting items. Pass
+   `--format readme` when the intended output is a README.
 3. Report the run path, verify reciprocal provenance with `bin/cf validate <run>` and
    `bin/cf vault validate`, then continue through the ordinary research decision and
    one-question-at-a-time interview. Never duplicate an existing item to start a run.
@@ -87,9 +88,10 @@ Preserve every run artifact and stop.
 ## Advance safely
 
 - Execute only the active stage or an explicitly valid route. Write the named artifact first, then update `run.json` atomically (temporary file plus rename), then validate.
+- Branch on `run.json` format while retaining the same stage graph, artifact names, and human gates. Load only the matching `creator/formats/<format>.md`.
 - Research conditionally. Explain the decision briefly. Separate verified fact, citation, dispute, interpretation, and unresolved issue. Never use research to invent the creator's view.
-- During interview, choose one question, persist it in `interview.md` with its functional lens, obtained/missing coverage, and an `Answer: pending` marker, update and validate `run.json`, then ask it and stop. After the response, replace the pending marker with the answer and record material obtained, material missing, and the functional lens needed next. Stop on coverage, normally after four to six questions.
-- Load creator files only from `<data-root>/creator`: `profile.md`, `voice.md`, `lessons.md`, and `formats/linkedin.md` for drafting or later voice/format evaluation; `sources.md` earlier only when its source policies matter.
+- During interview, choose one question, persist it in `interview.md` with its functional lens, obtained/missing coverage, and an `Answer: pending` marker, update and validate `run.json`, then ask it and stop. After the response, replace the pending marker with the answer and record material obtained, material missing, and the functional lens needed next. Stop on coverage rather than a fixed question count.
+- Load creator files only from `<data-root>/creator`: `profile.md`, `voice.md`, `lessons.md`, and the active `formats/<format>.md` for drafting or later voice/format evaluation; `sources.md` earlier only when its source policies matter.
 - Create real captured items only under `<data-root>/vault/items/`, optional available large material only under `<data-root>/vault/assets/<item-id>/`, and real runs only under `<data-root>/runs/`. Never write real content or copy private artifacts into tracked templates or `examples/`.
 - Run the six-lens Council only after clear human authorization. Produce one structured review and no automatic rewrite.
 - After Council feedback, write a concrete revision plan and stop. Interpret “apply” or equivalent approval as permission only for the visible pending plan; preserve the prior draft.
@@ -103,10 +105,59 @@ Preserve every run artifact and stop.
   discoverable as reusable content, but do not create another item without approval.
 - Propose at most five evidence-linked lessons after finalization. Never edit `<data-root>/creator/lessons.md` until the human explicitly approves individual candidates.
 
+## README runs
+
+Use this overlay only when `run.json` has `format: readme`. It specializes the shared
+workflow rather than replacing it.
+
+1. Before interviewing, inspect the target project, current README if present, source tree,
+   documentation, CLI help, tests, examples, and package metadata as relevant. Record the
+   exact project root and target README path in `spike.md`. The repository is source
+   material, not automatic proof of every documentation claim.
+2. Keep four evidence categories distinct in artifacts: repository-proven behavior,
+   documentation claims, explicit project-owner intent, and unresolved uncertainty. Use
+   external research only when a material factual claim cannot be verified from the
+   repository or owner.
+3. Interview adaptively, one focused question at a time, starting with the most important
+   gap after inspection. Useful lenses include primary audience, core problem, strongest
+   value proposition, first reader action, maturity, differentiation, non-goals, trust or
+   privacy, tone, and contribution posture. Do not use a fixed questionnaire. Stop when the
+   README can be accurate and useful.
+4. Make `content-brief.md` record target readers, primary promise, reader problem, desired
+   action, key proof, required sections, important commands, claims needing verification,
+   tone, avoidances, limitations, and unresolved questions.
+5. Make each `draft-NN.md` a proposed README, shaped by the active README format guidance.
+   The opening should quickly answer what the project is, why it matters, and how to try it.
+   Character counting remains available but is not a quality metric.
+6. After human authorization, run one README Council through these lenses: positioning,
+   first-minute comprehension, onboarding, technical accuracy, trust and credibility, and
+   voice and readability. Record what works, blockers, consensus, optional taste
+   suggestions, exact inaccurate claims or commands, a ranked revision plan, and one
+   recommended route. Do not revise automatically.
+7. Keep the proposed README and all run artifacts under the active private data root
+   through drafting, review, and revision. Do not edit the target README during an
+   unfinished run.
+8. Treat revision approval only as permission for the visible revision plan. When a final
+   candidate is pending, report the exact target path and show the complete candidate or
+   exact diff. Ask for explicit final approval. Only then create the approved `final.md`,
+   update and validate `run.json`, confirm the final artifact still matches the approved
+   candidate, and update that one target README. Do not commit. Preserve intentionally
+   retained project-specific information.
+9. After finalization, propose evidence-linked README lessons under the ordinary lesson
+   gate. Never add them to persistent creator guidance automatically.
+
 ## Intent is semantic, not keyword-based
 
 Map natural-language intent to a transition only when state and the pending gate make it unambiguous. “Run the council,” “get the panel's review,” and similar requests authorize Council only when a draft is pending. “Apply” approves only a clearly stated pending plan. If context permits multiple consequential interpretations, ask a short clarifying question.
 
 ## Quality and routing
 
-Use scores as diagnostic signals. If a draft lacks a distinctive thesis or lived example, route to interview. If it relies on an unsupported or time-sensitive claim, route to research. Prefer a justified backward route over endless surface polishing. Human decisions control taste, confidential material, factual responsibility, revision, final approval, and learning.
+Use scores as diagnostic signals. For LinkedIn, route to interview when a draft lacks a
+distinctive thesis or lived example. For README, route to interview when the audience,
+promise, desired action, maturity, scope, or owner intent remains materially unclear;
+reinspect the repository before drafting or revision when commands or capabilities are
+unsupported. If either format relies on an unsupported or time-sensitive external claim,
+route to research.
+Prefer a justified backward route over endless surface polishing. Human decisions control
+taste, confidential material, factual responsibility, revision, final approval, and
+learning.

@@ -22,6 +22,18 @@ vault item -> selected_idea -> research_decision -> research? -> interview -> dr
 
 Research is conditional. Council findings can route to revision, interview, research, or final human review. Revision normally runs at most twice; unresolved issues then go to the human. Every backward route records its reason in the new or updated artifact and `run.json`. Parking is an explicit non-terminal route from any incomplete stage; it preserves the stage and every artifact.
 
+## Reusable formats
+
+`format` is either `linkedin` or `readme`. Both formats use the same stage graph, state
+vocabulary, artifact pointers, revision limit, validation, and human gates. Format-specific
+creator guidance lives at `<data-root>/creator/formats/<format>.md`.
+
+A README run treats the target repository as source material. Before interviewing, inspect
+the current README, source tree, documentation, CLI help, tests, examples, and package
+metadata as relevant. Artifacts must distinguish repository-proven behavior, documentation
+claims, explicit owner intent, and unresolved uncertainty. The work remains private until
+the owner explicitly approves the visible final candidate for the exact target README.
+
 ## State vocabulary
 
 Valid `stage` values are `selected_idea`, `research_decision`, `research`, `interview`, `draft`, `council`, `revision`, `finalization`, `lessons`, and `complete`. Valid `status` values are `active`, `awaiting_human`, `parked`, and `complete`.
@@ -131,11 +143,18 @@ A run exists and the human has selected or supplied an idea.
 
 ### Inputs
 
-The supplied idea, title, any source note or vault item, and the human's initial confidentiality guidance.
+For LinkedIn, the supplied idea, title, any source note or vault item, and the human's
+initial confidentiality guidance. For README, the target project, exact target README path,
+repository evidence, existing documentation, and initial confidentiality guidance.
 
 ### Task
 
-Clarify only what is necessary and record the idea, why it may be worth developing, original source/provenance, known assumptions, unresolved questions, and confidentiality concerns. Do not silently upgrade an assumption to a fact.
+Clarify only what is necessary. For LinkedIn, record the idea, why it may be worth
+developing, provenance, assumptions, unresolved questions, and confidentiality concerns.
+For README, inspect first and record the project and target path, project purpose,
+repository evidence, documentation claims, owner intent, assumptions, unresolved questions,
+and the public/private boundary. Do not silently upgrade an assumption or documentation
+claim to a proven fact.
 
 ### Output artifact
 
@@ -143,7 +162,8 @@ Clarify only what is necessary and record the idea, why it may be worth developi
 
 ### Exit condition
 
-All six fields are present with honest “unknown” or “none identified” markers where needed.
+The active format's spike fields are present with honest "unknown" or "none identified"
+markers where needed.
 
 ### Possible routes
 
@@ -151,7 +171,8 @@ Proceed to `research_decision`; remain here for missing idea details.
 
 ### Human gate
 
-The human supplies the idea and decides what confidential material may be recorded.
+The human supplies the idea or identifies the target project and decides what confidential
+material may be recorded.
 
 ## Stage 2: Research decision
 
@@ -165,7 +186,12 @@ The human supplies the idea and decides what confidential material may be record
 
 ### Task
 
-Decide and briefly explain whether research is needed. Default to research for current facts, named people or organizations, quotations, numbers, potentially changed claims, material external disagreement, or unfamiliar subject matter. Research may be skipped for a clearly personal, non-factual reflection.
+Decide and briefly explain whether research is needed. Default to research for current
+facts, named people or organizations, quotations, numbers, potentially changed claims,
+material external disagreement, or unfamiliar subject matter. Research may be skipped for
+a clearly personal, non-factual reflection. For README, repository inspection is ordinary
+source work rather than external research; research only when a material claim still needs
+factual verification.
 
 ### Output artifact
 
@@ -195,7 +221,12 @@ Ask for confirmation when research could expose confidential information, materi
 
 ### Task
 
-Research only the material questions. Separate verified facts, citations/links, disputed claims, unresolved claims, and interpretation. Note dates and source quality. Produce useful interview questions without inferring the creator's position. If scope or confidentiality blocks progress, persist `research` + `awaiting_human` + `resolve_research_scope`.
+Research only the material questions. For README, prefer repository evidence and owner
+input; use external research only when factual verification is materially needed. Separate
+verified facts, citations/links, disputed claims, unresolved claims, and interpretation.
+Note dates and source quality. Produce useful interview questions without inferring the
+creator's position. If scope or confidentiality blocks progress, persist `research` +
+`awaiting_human` + `resolve_research_scope`.
 
 ### Output artifact
 
@@ -225,9 +256,25 @@ The research decision is recorded and any required initial research is complete.
 
 ### Task
 
-Choose exactly one next question. Before showing it, append a pending-question record to `interview.md` containing the question, functional lens, material already obtained, missing coverage it targets, and `Answer: pending`; atomically set `interview` + `awaiting_human` + `answer_interview_question` in `run.json`, then validate. Show that question and stop. After the human answers, replace the pending marker with the answer and record obtained material, remaining gaps, and the next interviewing move. Choose among functional lenses: direct thesis, concrete example, strongest objection, uncomfortable/self-interested angle, personal significance, practical takeaway, and forward-looking implication. Persona labels are optional mnemonics; always state their functional purpose.
+Choose exactly one next question based on the most important unresolved issue. Before
+showing it, append a pending-question record to `interview.md` containing the question,
+functional lens, material already obtained, missing coverage it targets, and
+`Answer: pending`; atomically set `interview` + `awaiting_human` +
+`answer_interview_question` in `run.json`, then validate. Show that question and stop.
+After the human answers, replace the pending marker with the answer and record obtained
+material, remaining gaps, and the next interviewing move.
 
-Normally ask four to six questions, but stop on coverage rather than count. Synthesize `content-brief.md` without fabricating a view.
+For LinkedIn, useful lenses include direct thesis, concrete example, strongest objection,
+uncomfortable/self-interested angle, personal significance, practical takeaway, and
+forward-looking implication. For README, useful lenses include primary audience, core
+problem, strongest value proposition, first reader action, maturity, differentiation,
+non-goals, trust or privacy, tone, and contribution posture. Do not use a fixed README
+questionnaire. Persona labels are optional mnemonics; always state their functional purpose.
+
+Stop on coverage rather than question count. Synthesize `content-brief.md` without
+fabricating a view. A README brief records target readers, primary promise, reader problem,
+desired action, key proof, required sections, important commands, public claims requiring
+verification, tone, avoidances, limitations, and unresolved questions.
 
 ### Output artifact
 
@@ -235,7 +282,10 @@ Normally ask four to six questions, but stop on coverage rather than count. Synt
 
 ### Exit condition
 
-There is a distinctive thesis, at least one concrete example, specificity and causal detail, tension/disagreement/objection, and a useful payoff or implication.
+LinkedIn has a distinctive thesis, at least one concrete example, specificity and causal
+detail, tension/disagreement/objection, and a useful payoff or implication. README has a
+supported project description, target reader, reader problem, primary promise, desired
+action, verified setup path, scope, limitations, and no blocking unresolved claim.
 
 ### Possible routes
 
@@ -253,11 +303,23 @@ Every answer comes from the human. The human may decline a question or mark an a
 
 ### Inputs
 
-Load at this stage: `<data-root>/creator/profile.md`, `voice.md`, `lessons.md`, `formats/linkedin.md`, the brief, interview, and current research. Do not load unrelated runs or vault files.
+Load at this stage: `<data-root>/creator/profile.md`, `voice.md`, `lessons.md`, the active
+`formats/<format>.md`, the brief, interview, and current research. For README also use the
+inspected repository evidence recorded for this run. Do not load unrelated runs or vault
+files.
 
 ### Task
 
-Draft primarily from the creator's interview language and thinking. Offer three hook options, one body, three closing options, and a recommended assembly. Use `bin/cf count draft-NN.md --section "Recommended assembled version"` for the post-body character count. Flag factual, confidentiality, and material uncertainty issues.
+For LinkedIn, draft primarily from the creator's interview language and thinking. Offer
+three hook options, one body, three closing options, and a recommended assembly. Use
+`bin/cf count draft-NN.md --section "Recommended assembled version"` for the post-body
+character count.
+
+For README, produce a complete proposed README grounded in repository evidence and owner
+input. The first screen should answer what the project is, why the reader should care, and
+how to try it. Include only useful sections from the format guidance. Verify copyable
+commands. Character counting remains available but is not a quality metric. For both
+formats, flag factual, confidentiality, and material uncertainty issues.
 
 ### Output artifact
 
@@ -265,7 +327,8 @@ Draft primarily from the creator's interview language and thinking. Offer three 
 
 ### Exit condition
 
-All required alternatives, assembly, count, and flags exist, and the draft has been shown to the human.
+The active format's required content and flags exist, and the draft has been shown to the
+human. The target README remains unchanged.
 
 ### Possible routes
 
@@ -287,7 +350,15 @@ The current draft, content brief, research flags, and relevant creator voice/for
 
 ### Task
 
-Run one structured review—not separate processes—through six lenses: (1) originality/depth, (2) clarity/structure, (3) specificity/evidence, (4) audience value/actionability, (5) voice authenticity, and (6) hook/payoff/LinkedIn fit. Identify what works, blockers, findings supported by at least two lenses, lens-specific observations, and a ranked revision plan. Score each lens and an overall diagnostic score; scores guide discussion rather than assert objective quality.
+Run one structured review, not separate processes. For LinkedIn use: (1)
+originality/depth, (2) clarity/structure, (3) specificity/evidence, (4) audience
+value/actionability, (5) voice authenticity, and (6) hook/payoff/LinkedIn fit.
+
+For README use: (1) positioning, (2) first-minute comprehension, (3) onboarding, (4)
+technical accuracy, (5) trust and credibility, and (6) voice and readability. Identify
+what works, blocking findings, consensus findings, optional taste suggestions, exact
+inaccurate claims or commands, and a ranked revision plan. Score each lens and an overall
+diagnostic score; scores guide discussion rather than assert objective quality.
 
 ### Output artifact
 
@@ -347,7 +418,18 @@ The approved draft, selected hook/closing, and remaining caveats.
 
 ### Task
 
-Create an immutable final copy, count its post body with `bin/cf count final.md --section "Approved post"`, and record selection, caveats, and approval. Do not publish.
+For LinkedIn, create an immutable final copy, count its post body with
+`bin/cf count final.md --section "Approved post"`, and record selection, caveats, and
+approval. Do not publish.
+
+For README, while the visible candidate still awaits `approve_final`, report the exact
+target path and show the complete final proposed content or exact diff. Only explicit
+approval of that candidate permits finalization. Then create `final.md` with the exact
+approved README content, update `run.json` atomically, and validate the private run. Confirm
+that `final.md` still matches the approved candidate before updating only the approved
+target README. Preserve intentionally retained repository-specific information and do not
+commit. Council authorization, revision-plan approval, or approval of a different
+candidate is not final approval.
 
 After writing and validating the final artifact, preserve all linked items and record the
 final path with `bin/cf vault finalize-run`. Record the run in each linked item's
@@ -367,7 +449,10 @@ to a later run without copying the earlier run.
 
 ### Exit condition
 
-Selected hook/closing, final character count, remaining factual caveats, and approval status are recorded.
+For LinkedIn, selected hook/closing, final character count, remaining factual caveats, and
+approval status are recorded. For README, `final.md` exactly matches the approved target
+README content, the approval and target path are recorded in the preceding Council or
+revision artifact, and the approved target file alone has been updated.
 
 ### Possible routes
 
@@ -375,7 +460,8 @@ Proceed to `lessons`; return to revision if approval is withheld.
 
 ### Human gate
 
-Explicit final approval is required. Publication remains wholly outside this workflow.
+Explicit final approval is required. README application is the only supported target-file
+write; publication and commits remain wholly outside this workflow.
 
 ## Stage 9: Lessons
 

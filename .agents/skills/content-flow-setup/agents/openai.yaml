@@ -1,4 +1,4 @@
 interface:
   display_name: "Content Flow Setup"
   short_description: "Build approved creator context and writing guidance"
-  default_prompt: "Help me set up or improve my creator profile, voice, sources, lessons, and LinkedIn format guidance."
+  default_prompt: "Help me set up or improve my creator profile, voice, sources, lessons, and reusable format guidance."

@@ -18,6 +18,7 @@ sys.path.insert(0, str(ROOT / "src"))
 from content_flow.cli import (
     CFError,
     CREATOR_FILES,
+    SUPPORTED_FORMATS,
     extract_markdown_section,
     git_safety_description,
     initialize_data_root,
@@ -52,6 +53,21 @@ class ContentFlowCLITests(unittest.TestCase):
         self.assertEqual(state["revision_round"], 0)
         self.assertEqual(validation_errors(run, state), [])
         self.assertTrue((run / "spike.md").is_file())
+
+    def test_readme_is_supported_without_changing_linkedin_default(self) -> None:
+        self.assertEqual(SUPPORTED_FORMATS, ("linkedin", "readme"))
+        readme_run = make_run(self.root, "Project README", "readme", date(2026, 7, 22))
+        linkedin_run = make_run(self.root, "LinkedIn default", "linkedin", date(2026, 7, 22))
+
+        readme_state = load_state(readme_run)
+        self.assertEqual(readme_state["format"], "readme")
+        self.assertEqual(validation_errors(readme_run, readme_state), [])
+        self.assertIn(
+            "## Repository evidence",
+            (readme_run / "spike.md").read_text(encoding="utf-8"),
+        )
+        self.assertEqual(load_state(linkedin_run)["format"], "linkedin")
+        self.assertIn("## Idea", (linkedin_run / "spike.md").read_text(encoding="utf-8"))
 
     def test_new_run_never_overwrites(self) -> None:
         first = make_run(self.root, "Same title", "linkedin", date(2026, 7, 22))
@@ -99,6 +115,37 @@ class ContentFlowCLITests(unittest.TestCase):
         with self.assertRaisesRegex(CFError, "refusing to overwrite"):
             initialize_data_root(data_root, ROOT)
         self.assertEqual(profile.read_text(encoding="utf-8"), "keep me")
+
+    def test_init_adds_missing_readme_format_without_overwriting_existing_private_files(self) -> None:
+        data_root = self.root / "private"
+        creator_root = data_root / "creator"
+        (creator_root / "formats").mkdir(parents=True)
+        private_readme = creator_root / "formats" / "readme.md"
+        private_readme.write_text("custom private README guidance\n", encoding="utf-8")
+        profile = creator_root / "profile.md"
+        profile.write_text("custom private profile\n", encoding="utf-8")
+
+        initialize_data_root(data_root, ROOT)
+
+        self.assertEqual(private_readme.read_text(encoding="utf-8"), "custom private README guidance\n")
+        self.assertEqual(profile.read_text(encoding="utf-8"), "custom private profile\n")
+        self.assertEqual(missing_creator_files(data_root), [])
+
+    def test_init_upgrades_older_root_with_only_missing_readme_format(self) -> None:
+        data_root = self.root / "private"
+        initialize_data_root(data_root, ROOT)
+        readme_format = data_root / "creator" / "formats" / "readme.md"
+        readme_format.unlink()
+        linkedin_format = data_root / "creator" / "formats" / "linkedin.md"
+        linkedin_before = linkedin_format.read_text(encoding="utf-8")
+
+        initialize_data_root(data_root, ROOT)
+
+        self.assertEqual(
+            readme_format.read_text(encoding="utf-8"),
+            (ROOT / "templates" / "creator" / "formats" / "readme.md").read_text(encoding="utf-8"),
+        )
+        self.assertEqual(linkedin_format.read_text(encoding="utf-8"), linkedin_before)
 
     def test_init_fails_for_unignored_root_inside_git_repository(self) -> None:
         repository = self.root / "repository"
@@ -190,6 +237,42 @@ class ContentFlowCLITests(unittest.TestCase):
             self.assertEqual(main(["validate", run.name, "--data-dir", str(data_root)], root=ROOT), 0)
         self.assertIn(f"run_path: {run.resolve()}", output.getvalue())
         self.assertIn(f"OK {run.resolve()}", output.getvalue())
+
+    def test_readme_run_status_validation_and_resume_from_disk(self) -> None:
+        data_root = self.root / "explicit"
+        initialize_data_root(data_root, ROOT)
+        run = make_run(data_root, "Reusable README", "readme", date(2026, 7, 22))
+
+        first_output = io.StringIO()
+        with contextlib.redirect_stdout(first_output):
+            self.assertEqual(main(["status", run.name, "--data-dir", str(data_root)], root=ROOT), 0)
+            self.assertEqual(main(["validate", run.name, "--data-dir", str(data_root)], root=ROOT), 0)
+
+        resumed = load_state(resolve_run(run.name, data_root))
+        self.assertEqual(resumed["format"], "readme")
+        self.assertEqual(resumed["pending_human_action"], "provide_idea_details")
+        self.assertIn("format: readme", first_output.getvalue())
+
+    def test_new_run_cli_accepts_readme(self) -> None:
+        data_root = self.root / "explicit"
+        initialize_data_root(data_root, ROOT)
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            result = main(
+                [
+                    "new-run",
+                    "--title",
+                    "CLI README",
+                    "--format",
+                    "readme",
+                    "--data-dir",
+                    str(data_root),
+                ],
+                root=ROOT,
+            )
+        self.assertEqual(result, 0)
+        run = next((data_root / "runs").iterdir())
+        self.assertEqual(load_state(run)["format"], "readme")
 
     def test_content_flow_home_selects_data_root(self) -> None:
         data_root = self.root / "environment"
@@ -347,6 +430,114 @@ class ContentFlowCLITests(unittest.TestCase):
             (run / filename).write_text(filename, encoding="utf-8")
 
         self.assertEqual(validation_errors(run, state), [])
+
+    def test_readme_council_requires_human_gate_and_does_not_revise(self) -> None:
+        run = make_run(self.root, "Council README", "readme", date(2026, 7, 22))
+        target = self.root / "project" / "README.md"
+        target.parent.mkdir()
+        target.write_text("# Existing project README\n", encoding="utf-8")
+        state = load_state(run)
+        state.update(
+            stage="draft",
+            status="awaiting_human",
+            research_required=False,
+            pending_human_action="authorize_council",
+        )
+        state["artifacts"].update(
+            interview="interview.md",
+            brief="content-brief.md",
+            draft="draft-01.md",
+        )
+        for filename in ("interview.md", "content-brief.md", "draft-01.md"):
+            (run / filename).write_text(filename, encoding="utf-8")
+        (run / "run.json").write_text(json.dumps(state), encoding="utf-8")
+
+        self.assertEqual(validation_errors(run, state), [])
+        self.assertEqual(target.read_text(encoding="utf-8"), "# Existing project README\n")
+        self.assertFalse((run / "council-01.md").exists())
+        self.assertFalse((run / "draft-02.md").exists())
+
+        (run / "council-01.md").write_text(
+            "# README Council\n\nHuman authorization: recorded.\n",
+            encoding="utf-8",
+        )
+        state.update(
+            stage="council",
+            pending_human_action="approve_final",
+        )
+        state["artifacts"].update(council="council-01.md", council_1="council-01.md")
+        self.assertEqual(validation_errors(run, state), [])
+        self.assertFalse((run / "draft-02.md").exists())
+        self.assertEqual(target.read_text(encoding="utf-8"), "# Existing project README\n")
+
+    def test_readme_approved_revision_preserves_draft_and_target(self) -> None:
+        run = make_run(self.root, "Revised README", "readme", date(2026, 7, 22))
+        target = self.root / "project" / "README.md"
+        target.parent.mkdir()
+        target.write_text("# Existing project README\n", encoding="utf-8")
+        state = load_state(run)
+        state.update(
+            stage="revision",
+            status="awaiting_human",
+            research_required=False,
+            revision_round=0,
+            pending_human_action="approve_revision_plan",
+        )
+        state["artifacts"].update(
+            interview="interview.md",
+            brief="content-brief.md",
+            draft="draft-01.md",
+            draft_1="draft-01.md",
+            council="council-01.md",
+            council_1="council-01.md",
+            revision_plan="revision-plan-01.md",
+            revision_plan_1="revision-plan-01.md",
+        )
+        for filename in (
+            "interview.md",
+            "content-brief.md",
+            "draft-01.md",
+            "council-01.md",
+            "revision-plan-01.md",
+        ):
+            (run / filename).write_text(filename, encoding="utf-8")
+
+        self.assertEqual(validation_errors(run, state), [])
+        self.assertFalse((run / "draft-02.md").exists())
+        self.assertEqual(target.read_text(encoding="utf-8"), "# Existing project README\n")
+
+        (run / "draft-02.md").write_text("approved revised README", encoding="utf-8")
+        state.update(
+            revision_round=1,
+            pending_human_action="review_draft",
+        )
+        state["artifacts"].update(
+            draft="draft-02.md",
+            draft_2="draft-02.md",
+            revision="draft-02.md",
+        )
+        self.assertEqual(validation_errors(run, state), [])
+        self.assertTrue((run / "draft-01.md").is_file())
+        self.assertEqual(target.read_text(encoding="utf-8"), "# Existing project README\n")
+
+    def test_readme_target_update_is_an_explicit_procedural_gate(self) -> None:
+        skill = (ROOT / ".agents" / "skills" / "content-flow" / "SKILL.md").read_text(
+            encoding="utf-8"
+        )
+        normalized = " ".join(skill.split())
+        self.assertIn("show the complete candidate or exact diff", normalized)
+        self.assertIn("Ask for explicit final approval", normalized)
+        self.assertIn("update that one target README", normalized)
+        self.assertIn("do not commit", normalized.lower())
+
+    def test_readme_run_artifacts_stay_out_of_tracked_framework_locations(self) -> None:
+        tracked_readme_before = (ROOT / "README.md").read_bytes()
+        run = make_run(self.root, "Private README work", "readme", date(2026, 7, 22))
+
+        self.assertTrue(run.is_relative_to(self.root))
+        self.assertFalse(run.is_relative_to(ROOT))
+        self.assertEqual((ROOT / "README.md").read_bytes(), tracked_readme_before)
+        self.assertFalse((ROOT / "runs").exists())
 
     def test_validate_rejects_stale_current_artifact_pointer(self) -> None:
         run = make_run(self.root, "Stale pointer", "linkedin", date(2026, 7, 22))
