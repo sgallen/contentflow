@@ -338,6 +338,33 @@ class VaultCLITests(unittest.TestCase):
         result, _, _ = self.run_cli("vault", "validate")
         self.assertEqual(result, 0)
 
+    def test_refinalized_run_preserves_historical_final_without_counting_another_use(self) -> None:
+        item_id = self.capture("Reopened final")
+        run_path = self.start("--title", "Reopened final", "--vault-item", item_id)
+        self.finalize(run_path)
+
+        (run_path / "final-02.md").write_text("# Final 02\n", encoding="utf-8")
+        state_path = run_path / "run.json"
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+        state["artifacts"]["final"] = "final-02.md"
+        state_path.write_text(json.dumps(state), encoding="utf-8")
+
+        result, _, stderr = self.run_cli("vault", "finalize-run", run_path.name)
+        self.assertEqual((result, stderr), (0, ""))
+        metadata, _ = load_item(self.data_root / "vault" / "items" / f"{item_id}.md")
+        self.assertEqual(metadata["successful_runs"], [run_path.name])
+        self.assertEqual(metadata["use_count"], 1)
+        self.assertEqual(
+            metadata["final_artifacts"],
+            [
+                f"runs/{run_path.name}/final.md",
+                f"runs/{run_path.name}/final-02.md",
+            ],
+        )
+        self.assertEqual(load_state(run_path)["final_artifact"], "final-02.md")
+        result, _, _ = self.run_cli("vault", "validate")
+        self.assertEqual(result, 0)
+
     def test_same_source_and_idea_can_complete_multiple_distinct_runs(self) -> None:
         source = self.capture("Reusable source")
         first = self.start("--title", "First angle", "--vault-item", source)

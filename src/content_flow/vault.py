@@ -514,18 +514,21 @@ def validate_relationships(data_root: Path) -> tuple[list[str], list[str]]:
                 errors.append(f"{path}: developing item requires at least one active linked run")
         for artifact in metadata["final_artifacts"]:
             artifact_path = data_root / artifact
-            run_id = Path(artifact).parts[1]
             if not artifact_path.is_file():
                 warnings.append(f"{path}: historical final artifact is not present locally: {artifact}")
-                continue
+        for run_id in metadata["successful_runs"]:
             state_path = runs_root / run_id / "run.json"
             if state_path.is_file():
                 try:
                     state = json.loads(state_path.read_text(encoding="utf-8"))
                 except (json.JSONDecodeError, UnicodeDecodeError):
                     continue
-                if state.get("artifacts", {}).get("final") != Path(artifact).name:
-                    errors.append(f"{path}: final artifact does not match successful run '{run_id}'")
+                current_final = state.get("final_artifact") or state.get("artifacts", {}).get("final")
+                current_reference = f"runs/{run_id}/{current_final}" if current_final else None
+                if current_reference not in metadata["final_artifacts"]:
+                    errors.append(
+                        f"{path}: current final artifact does not match successful run '{run_id}'"
+                    )
     index = data_root / "vault" / "index.md"
     if not index.exists():
         errors.append(f"{index}: generated index is missing")

@@ -283,6 +283,17 @@ class ContentFlowCLITests(unittest.TestCase):
             validation_errors(run, state),
         )
 
+    def test_validate_allows_versioned_final_and_lessons_after_reopen(self) -> None:
+        run = make_run(self.root, "Reopened final", "linkedin", date(2026, 7, 22))
+        state = load_state(run)
+        state["artifacts"]["final"] = "final-02.md"
+        state["artifacts"]["lessons"] = "lesson-candidates-02.md"
+        state["final_artifact"] = "final-02.md"
+        (run / "final-02.md").write_text("final", encoding="utf-8")
+        (run / "lesson-candidates-02.md").write_text("lessons", encoding="utf-8")
+
+        self.assertEqual(validation_errors(run, state), [])
+
     def test_validate_enforces_cumulative_council_artifacts(self) -> None:
         run = make_run(self.root, "Council history", "linkedin", date(2026, 7, 22))
         state = load_state(run)
@@ -309,6 +320,33 @@ class ContentFlowCLITests(unittest.TestCase):
             "revision_round greater than 0 requires artifact 'revision'",
             validation_errors(run, state),
         )
+
+    def test_revision_plan_from_human_feedback_does_not_require_council(self) -> None:
+        run = make_run(self.root, "Human feedback", "linkedin", date(2026, 7, 22))
+        state = load_state(run)
+        state.update(
+            stage="revision",
+            status="awaiting_human",
+            research_required=False,
+            pending_human_action="approve_revision_plan",
+        )
+        state["artifacts"].update(
+            interview="interview.md",
+            brief="content-brief.md",
+            draft="draft-01.md",
+            draft_1="draft-01.md",
+            revision_plan="revision-plan-01.md",
+            revision_plan_1="revision-plan-01.md",
+        )
+        for filename in (
+            "interview.md",
+            "content-brief.md",
+            "draft-01.md",
+            "revision-plan-01.md",
+        ):
+            (run / filename).write_text(filename, encoding="utf-8")
+
+        self.assertEqual(validation_errors(run, state), [])
 
     def test_validate_rejects_stale_current_artifact_pointer(self) -> None:
         run = make_run(self.root, "Stale pointer", "linkedin", date(2026, 7, 22))

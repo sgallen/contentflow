@@ -91,7 +91,8 @@ STAGE_ARTIFACTS = {
     "interview": ("spike", "interview"),
     "draft": ("spike", "interview", "brief", "draft"),
     "council": ("spike", "interview", "brief", "draft", "council"),
-    "revision": ("spike", "interview", "brief", "draft", "council", "revision_plan"),
+    # Human feedback may create a revision plan before any Council review.
+    "revision": ("spike", "interview", "brief", "draft", "revision_plan"),
     "finalization": ("spike", "interview", "brief", "draft", "council", "final"),
     "lessons": ("spike", "interview", "brief", "draft", "council", "final", "lessons"),
     "complete": ("spike", "interview", "brief", "draft", "council", "final", "lessons"),
@@ -123,8 +124,8 @@ ARTIFACT_NAME_PATTERNS = {
     "council": re.compile(r"council-\d{2}\.md"),
     "revision_plan": re.compile(r"revision-plan-\d{2}\.md"),
     "revision": re.compile(r"draft-\d{2}\.md"),
-    "final": re.compile(r"final\.md"),
-    "lessons": re.compile(r"lesson-candidates\.md"),
+    "final": re.compile(r"final(?:-\d{2})?\.md"),
+    "lessons": re.compile(r"lesson-candidates(?:-\d{2})?\.md"),
 }
 DEFAULT_ARTIFACTS = {
     "spike": "spike.md",
