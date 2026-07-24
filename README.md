@@ -1,222 +1,209 @@
-# Content Flow v0
+# Content Flow
 
-Content Flow is a reusable, local-first Codex framework for developing human-approved
-content. Its initial formats are LinkedIn posts, X posts/threads, and project READMEs. The tracked repository
-contains workflow instructions, deterministic tooling, blank templates, tests, and
-fictional examples. Active creator context and real work stay in an ignored private data
-root.
+Content Flow is a local-first workflow for turning rough ideas into content you are
+actually willing to put your name on.
 
-It is intentionally **not** an agent service, web app, publishing system, workflow server, or OpenAI API integration. It has no connectors, background jobs, vector database, or multi-agent runtime.
+## TL;DR
 
-## Requirements
+AI can write a decent-looking post from almost nothing.
 
-- Git
-- Python 3.10+
-- Codex opened at this repository root
+That's the problem.
 
-No package install is required. See `DATA_ROOT.md` for the canonical data-root rule and strict public/private classification.
+The research can be thin. The point of view can be generic. The writing can look finished
+before the thinking has started.
 
-## Initialize private data
-
-The default private root is `<repository>/.content-flow`:
-
-```bash
-bin/cf init
-```
-
-Initialization reports the exact absolute root and confirms Git-ignore status. It copies
-missing blank tracked starters from `templates/creator/`, creates `vault/items/`,
-`vault/assets/`, generated `vault/index.md`, and `runs/`, and never overwrites existing
-creator files.
-
-Select another private root either per command or through the environment:
-
-```bash
-bin/cf init --data-dir ~/private/content-flow
-CONTENT_FLOW_HOME=~/private/content-flow bin/cf data-root
-```
-
-Do not put credentials or authentication tokens in creator source guidance. The private root need not be a Git repository; `DATA_ROOT.md` describes optional separate private versioning.
-
-To personalize the initialized files later, invoke `$content-flow-setup`. That skill reports every private path before it changes anything. Files under `templates/creator/` are never active configuration.
-
-## Capture material without starting a run
-
-Quick capture records only supplied material, its reason, known metadata, and an `inbox`
-timestamp:
-
-```bash
-bin/cf vault capture \
-  --kind source \
-  --title "A useful fictional article" \
-  --url "https://example.com/fictional-article" \
-  --note "Its distinction between activity and progress may be useful later"
-```
-
-Use `--material` instead of or in addition to `--url` for a quote, observation, transcript
-excerpt, or rough idea. Repeat `--tag` as needed. Supported kinds are `source`, `idea`,
-`observation`, `quote`, `excerpt`, and `run-fragment`.
-
-An enriched capture starts from the same scaffold, then the Content Flow skill may add a
-concise summary, source-supported specifics, proposed angles, and open questions. It labels
-source-derived information separately from interpretation and does not manufacture the
-creator's view. Enrichment is optional.
-
-```bash
-bin/cf vault list --status parked --tag leadership
-bin/cf vault show <item-id>
-bin/cf vault update <item-id> --status ready --revisit-after 2026-09-01
-bin/cf vault rebuild-index
-bin/cf vault validate
-```
-
-`vault/index.md` is a deterministic grouped view, not source of truth. Item age never
-changes status automatically.
-
-## Start a run
-
-For existing content, the primary interface is a short conversational request to
-`$content-flow`:
+Content Flow makes the model do the work first. Bring it a source or rough idea. It
+researches when the facts need work, interviews you to establish what you actually think,
+drafts from that material, reviews the result through several editorial lenses, and stops
+when your judgment is required.
 
 ```text
-Let's adapt the Bostrom post for X.
-Turn my latest LinkedIn post into an X thread.
-Create three standalone X posts from the agent-first piece.
-Create the LinkedIn version of the X thread we finished yesterday.
+Capture -> Develop -> Research if needed -> Interview -> Draft -> Review -> Revise -> Reuse
 ```
 
-Content Flow searches the active private root, briefly names the selected source, and asks
-one concise question only when the source or destination is genuinely ambiguous. If X is
-requested without a variant, it recommends a single post, thread, or several standalone
-posts from the material and asks for confirmation. It then reuses the original brief,
-research, interview, final approved source rendering, and linked vault provenance while
-drafting natively for the destination. Source finals remain unchanged; every destination
-keeps its own draft review, Council, revision, final approval, and lesson gates.
+You talk to Codex. The workflow records the research, answers, decisions, drafts, and
+approvals as files, so the work can survive the chat.
 
-When destination-platform evidence is sparse, Content Flow says that voice calibration is
-still tentative, uses the creator's general voice plus established platform constraints,
-and does not invent or persist preferences.
+Research supplies facts. The creator supplies the point of view.
 
-For mechanical troubleshooting and reference, the underlying commands are:
+Content Flow supports LinkedIn, X, and project READMEs. It does not require an LLM API
+integration, workflow server, database, custom UI, or background agent system.
 
-```bash
-bin/cf find "Bostrom"
-bin/cf find "my latest LinkedIn post" --json
-bin/cf adapt run:<run-id>:linkedin:final --to x --x-variant thread
-```
+## How it works
 
-`find` performs deterministic index-on-read lexical ranking over private run/vault
-metadata and artifacts. It supports partial titles, recognizable phrases, modest spelling
-variation, explicit drafts, formats, and recency; it adds no database, embeddings, or
-semantic-vector infrastructure. `adapt` creates a new linked destination run when an
-existing requested format cannot safely be activated.
+Start with something messy: a link, quote, observation, completed post, or idea you are
+not ready to defend yet.
 
-For a new idea rather than existing content, use the ordinary run initializer:
+If the piece depends on current facts, disputed claims, numbers, or quotations, Content
+Flow researches the gaps. If it doesn't, it moves on.
 
-```bash
-bin/cf new-run --title "Why small teams need decision logs" --format linkedin
-bin/cf new-run --title "Why small teams need decision logs" --format x --x-variant single
-bin/cf new-run --title "Why small teams need decision logs" \
-  --format linkedin --format x --primary-format linkedin
-bin/cf new-run --title "Improve the project README" --format readme
-bin/cf new-run --vault-item <item-id>
-bin/cf new-run --vault-item <origin-id> --contributing-vault-item <source-id>
-```
+Then it interviews you. One useful question at a time. The next question depends on what
+the piece still needs, not a canned questionnaire.
 
-The command reports the active data root and absolute run path. A first-run prompt can be:
+Once there is enough substance, Content Flow drafts from the evidence, your answers, your
+creator profile, your voice guidance, and lessons you have explicitly approved.
+
+The Writer's Council reviews the result through distinct editorial lenses. It is one
+orchestrator, not a pretend room full of independent experts. The scores are diagnostic,
+not truth.
+
+Feedback becomes a revision plan. You approve the plan before the draft changes and the
+final piece before it is finalized.
+
+And if the draft has no real point?
+
+Another rewrite is probably not progress. Go back for better evidence or ask the question
+that should have been asked in the first place.
+
+## Quick start
+
+You need Git, Python 3.10+, a local checkout of this repository, and Codex opened at the
+repository root. No Python package installation, API key, database, or service deployment
+is required.
+
+### 1. Set it up
 
 ```text
-Use $content-flow to start a new run.
+Use $content-flow-setup.
 
-The idea is: Small teams often mistake more communication for better coordination, when the real problem is that important decisions have no clear owner or revisit condition.
-
-Guide me through the workflow one human gate at a time. Do not invent my point of view, and ask interview questions one at a time.
+Initialize Content Flow in the default private data root, tell me its exact path, and guide
+me through the minimum creator setup for LinkedIn and X.
 ```
 
-Real spikes and runs are written only under the active private root. `examples/` remains fictional and tracked.
+Content Flow creates the private structure, reports where your data lives, and shows you
+subjective guidance before writing it.
 
-Selecting a vault item changes it to `developing`, links both sides, and preserves item
-provenance in `spike.md`. Multiple items may contribute to one run.
+### 2. Save something
 
-Social runs research and interview once, then create one channel-neutral content brief.
-Each requested format has independent drafts, Council authorization, revisions, final
-approval, lessons, and a final artifact under `formats/<format>/`. A primary is rendered
-first; secondary adaptation reloads shared substance and destination guidance rather than
-mechanically shortening the primary. X supports `single`, `thread`, and multiple
-`standalone` posts.
+```text
+Use $content-flow to save this idea for later:
 
-A README run uses the same research decision, adaptive one-question-at-a-time interview,
-content brief, draft, authorized Council review, approved revision, final approval, and
-lesson proposal stages. It inspects the target repository and existing README as source
-material, separating repository-proven behavior, documentation claims, owner intent, and
-uncertainty. Drafts remain private. Content Flow changes the exact target README only after
-showing the final content or diff and receiving explicit approval, and it never commits.
-
-## Park, resume, and complete linked work
-
-`$content-flow` prepares a written parking assessment before using the mechanical route:
-
-```bash
-bin/cf vault park-run <run-id> --reason "Needs a lived example" \
-  --assessment-file <run-path>/parking-assessment-01.md
-bin/cf vault resume-run <run-id>
+More communication did not help the project because nobody owned the decision.
 ```
 
-Parking preserves the entire run. An originating item is updated rather than duplicated;
-an unlinked run creates one `run-fragment`. Parking preserves prior successful uses and
-records the assessment for later mining. When a final artifact exists,
-`bin/cf vault finalize-run <run-id> --format <format>` records successful history for each linked origin,
-contributor, and derived idea. Non-archived items normally return to `ready`; another
-unfinished active run keeps them `developing`.
+A link, quote, excerpt, observation, or half-formed idea works too.
 
-## Resume or inspect
+### 3. Develop it
 
-```bash
-bin/cf status <run-id>
-bin/cf validate <run-id>
+```text
+Use $content-flow to develop the idea I just saved into a LinkedIn post.
+
+Guide me through the workflow one human gate at a time.
 ```
 
-A bare run ID resolves under `<data-root>/runs/`. An explicit absolute or multi-component relative path can address a run elsewhere, such as the fictional `examples/completed-run`.
+That is enough. Content Flow decides whether research is warranted, starts the interview,
+and stops at each human gate.
 
-Use `--data-dir <path>` on `new-run`, `status`, or `validate`, or set `CONTENT_FLOW_HOME`, to select the same non-default root.
+### 4. Reuse it
 
-## Vault lifecycle
-
-`inbox` is captured but unreviewed; `ready` is available for development or reuse;
-`developing` has an unfinished active run; `parked` preserves value that is not currently
-ready; and `archived` is intentionally out of active consideration. Usage is separate
-history (`successful_runs`, `use_count`, `last_used_at`, and `final_artifacts`), not an
-availability state. Sources, ideas, successful angles, and completed artifacts may all
-support later runs. Nothing ages or succeeds automatically into `archived`.
-
-Useful inspection commands include:
-
-```bash
-bin/cf vault list --status ready
-bin/cf vault list --successful yes
-bin/cf vault show <item-id>
+```text
+Use $content-flow to turn my latest LinkedIn post into an X thread.
 ```
 
-The generated index surfaces successful reusable items and multi-run rich sources without
-removing them from their current availability views. See `VAULT.md` for the one-to-many
-lineage model and validation rules.
+Content Flow finds the private source and reuses its research, interview, brief, approved
+framing, and provenance. Then it drafts for X. It does not chop a LinkedIn post into
+280-character pieces and call that adaptation.
 
-## Tests and utilities
+You do not need to memorize run IDs, artifact paths, or CLI commands.
 
-```bash
-python3 -m unittest discover -s tests -v
-bin/cf validate examples/completed-run
-bin/cf count examples/completed-run/formats/linkedin/final.md
-bin/cf count examples/completed-run/formats/linkedin/final.md --section "Approved post"
-```
+## Work that compounds
 
-See `WORKFLOW.md` for stage contracts, `ARCHITECTURE.md` for design boundaries, and `ACCEPTANCE.md` for verifiable completion criteria.
+Chat history is a weak durable record for work you care about.
 
-The private root may be its own Git repository. Content Flow works without Git and never
-commits automatically. A normal manual snapshot is:
+The private vault keeps sources, ideas, observations, parked work, and completed-content
+provenance as readable Markdown. Runs preserve the research, interview, brief, drafts,
+Council feedback, approved revisions, final content, and current state.
 
-```bash
-cd .content-flow
-git add vault runs creator
-git commit -m "Capture Content Flow material"
-```
+Status and history answer different questions:
+
+- **Can I use this now?** That is status.
+- **What have I already done with it?** That is history.
+
+A source that produced one strong piece may be more valuable afterward, not less. Use it
+for another angle, audience, format, or follow-up. Finalizing one post does not consume the
+source or exhaust the idea. That would be a terrible content system.
+
+LinkedIn and X can share research, interviewing, and a brief while keeping their drafts,
+reviews, revisions, approvals, and lessons independent. X supports a single post, thread,
+or several standalone posts.
+
+README runs use the same human-controlled workflow with repository inspection and
+README-specific review. Content Flow cannot change the target README until it shows the
+complete candidate or exact diff and receives explicit approval.
+
+## Public framework, private work
+
+The reusable machinery belongs in the public repository. Your actual work does not.
+
+| Shareable framework | Private by default |
+| --- | --- |
+| Skills and CLI | Creator profile and voice guide |
+| Schemas and blank templates | Approved lessons and source configuration |
+| Tests and fictional examples | Real vault items and research |
+| Documentation | Interviews, drafts, final content, and run state |
+
+The default private path is `.content-flow/`.
+
+Under the hood, `bin/cf` checks `--data-dir`, then `CONTENT_FLOW_HOME`, then the default.
+Most users can let the skills handle it.
+
+This repository ignores `.content-flow/`, which helps prevent accidental tracking.
+
+Git ignore is not encryption. It is not access control. Protect the directory and its
+backups like any other private work.
+
+The private data root can be its own private Git repository. Content Flow will not
+initialize it, stage files, commit, publish, or create a remote automatically.
+
+## Simple on purpose
+
+You talk. Codex orchestrates. A deterministic, standard-library Python CLI handles the
+boring but important work underneath: private-root resolution, scaffolding, discovery,
+state transitions, validation, lineage, migration, and character counts.
+
+The CLI does not decide what is worth saying. Good.
+
+The architecture is Markdown, JSON, skills, and local tooling. There is no workflow server
+hiding behind the repository.
+
+Content Flow does not require:
+
+- a separate LLM API integration
+- LangGraph or Temporal
+- a database or vector store
+- a custom UI
+- Notion or OpenClaw
+- background scheduling
+- automatic publishing
+- multiple independent agents
+
+It also does not scan LinkedIn, X, websites, private accounts, or inspiration feeds to
+generate ideas automatically.
+
+The project is useful today for someone comfortable opening a repository in Codex. The
+design is portable in principle, but Codex is the implemented runtime. Support for Claude
+or another runtime is not verified.
+
+## Inspiration
+
+Credit where it's due.
+
+[Alex Lieberman showed off his Content Machine on the How I AI podcast](https://youtu.be/1_jlukb7gm4?si=jUw_dz4LX8YUt3zC).
+It is a Claude Code desktop plugin he and his team use at Tenex. The demo walked through
+an Oracle, interview panel, voice files, Writer's Council, and a loop that learns from
+feedback.
+
+I watched that and built Content Flow.
+
+The useful insight was not that content needed more AI. It was that a strong workflow
+could come from simple ingredients: skills, persistent files, adaptive interviewing,
+editorial review, and human checkpoints.
+
+## Documentation
+
+- [`WORKFLOW.md`](WORKFLOW.md) defines stages, artifacts, and human gates.
+- [`DATA_ROOT.md`](DATA_ROOT.md) defines private-root selection and the public/private
+  boundary.
+- [`VAULT.md`](VAULT.md) describes capture, availability, reuse, and lineage.
+- [`ARCHITECTURE.md`](ARCHITECTURE.md) explains the deliberately simple design.
+- [`ACCEPTANCE.md`](ACCEPTANCE.md) lists verifiable project criteria.
