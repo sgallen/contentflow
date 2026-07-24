@@ -49,10 +49,27 @@ class VaultCLITests(unittest.TestCase):
         return next(line.split(": ", 1)[1] for line in stdout.splitlines() if line.startswith("item_id: "))
 
     def finalize(self, run_path: Path) -> None:
-        (run_path / "final.md").write_text("# Final\n", encoding="utf-8")
+        format_dir = run_path / "formats" / "linkedin"
+        for name in ("draft-01.md", "council-01.md", "final.md", "lesson-candidates.md"):
+            (format_dir / name).write_text(f"# {name}\n", encoding="utf-8")
         state_path = run_path / "run.json"
         state = json.loads(state_path.read_text(encoding="utf-8"))
-        state["artifacts"]["final"] = "final.md"
+        fmt = state["format_states"]["linkedin"]
+        fmt.update(stage="complete", status="complete", disposition="finalized")
+        fmt["artifacts"].update(
+            draft="formats/linkedin/draft-01.md",
+            council="formats/linkedin/council-01.md",
+            final="formats/linkedin/final.md",
+            lessons="formats/linkedin/lesson-candidates.md",
+        )
+        state["shared_state"].update(
+            stage="complete", status="complete", research_required=False,
+            pending_human_action="none",
+        )
+        for name in ("interview.md", "content-brief.md"):
+            (run_path / name).write_text(name, encoding="utf-8")
+        state["shared_artifacts"].update(interview="interview.md", brief="content-brief.md")
+        state["status"] = "complete"
         state_path.write_text(json.dumps(state), encoding="utf-8")
         result, _, stderr = self.run_cli("vault", "finalize-run", run_path.name)
         self.assertEqual((result, stderr), (0, ""))
@@ -213,7 +230,6 @@ class VaultCLITests(unittest.TestCase):
         state["origin_vault_items"] = ["missing-item"]
         state["linked_vault_items"] = ["missing-item"]
         state["status"] = "parked"
-        state["pending_human_action"] = "none"
         state["parking_reason"] = ""
         state["parked_at"] = "not-a-time"
         state_path.write_text(json.dumps(state), encoding="utf-8")
@@ -284,7 +300,7 @@ class VaultCLITests(unittest.TestCase):
         self.assertEqual(len(list((self.data_root / "vault" / "items").glob("*.md"))), 1)
         state = load_state(run_path)
         self.assertEqual(state["status"], "parked")
-        self.assertEqual(state["pending_human_action"], "none")
+        self.assertEqual(state["shared_state"]["pending_human_action"], "provide_idea_details")
         metadata, body = load_item(self.data_root / "vault" / "items" / f"{item_id}.md")
         self.assertEqual(metadata["status"], "parked")
         self.assertIn("Needs lived experience", body)
@@ -302,7 +318,7 @@ class VaultCLITests(unittest.TestCase):
         result, _, _ = self.run_cli("vault", "resume-run", run_path.name)
         self.assertEqual(result, 0)
         state = load_state(run_path)
-        self.assertEqual((state["status"], state["pending_human_action"]), ("awaiting_human", "provide_idea_details"))
+        self.assertEqual((state["status"], state["shared_state"]["pending_human_action"]), ("awaiting_human", "provide_idea_details"))
         metadata, _ = load_item(items[0])
         self.assertEqual(metadata["status"], "developing")
 
@@ -327,26 +343,88 @@ class VaultCLITests(unittest.TestCase):
             self.assertEqual(metadata["use_count"], 1)
             self.assertEqual(
                 metadata["final_artifacts"],
-                [f"runs/{run_path.name}/final.md"],
+                [f"runs/{run_path.name}/formats/linkedin/final.md"],
             )
             self.assertIsNotNone(metadata["last_used_at"])
         result, _, stderr = self.run_cli("vault", "finalize-run", run_path.name)
         self.assertEqual((result, stderr), (0, ""))
         origin_meta, _ = load_item(self.data_root / "vault" / "items" / f"{origin}.md")
         self.assertEqual((origin_meta["use_count"], len(origin_meta["successful_runs"])), (1, 1))
-        self.assertEqual(load_state(run_path)["final_artifact"], "final.md")
+        self.assertEqual(
+            load_state(run_path)["format_states"]["linkedin"]["final_artifact"],
+            "formats/linkedin/final.md",
+        )
         result, _, _ = self.run_cli("vault", "validate")
         self.assertEqual(result, 0)
+
+    def test_multiformat_final_artifacts_are_recorded_independently(self) -> None:
+        item_id = self.capture("Multi-format lineage")
+        run = self.start(
+            "--title", "Both outputs", "--vault-item", item_id,
+            "--format", "linkedin", "--format", "x", "--primary-format", "linkedin",
+            "--x-variant", "single",
+        )
+        state = load_state(run)
+        for name in ("interview.md", "content-brief.md"):
+            (run / name).write_text(name, encoding="utf-8")
+        state["shared_state"].update(
+            stage="complete", status="complete", research_required=False,
+            pending_human_action="none",
+        )
+        state["shared_artifacts"].update(interview="interview.md", brief="content-brief.md")
+        for format_name in ("linkedin", "x"):
+            directory = run / "formats" / format_name
+            final_text = (
+                "<!-- cf:x-variant: single -->\n\n## Recommended final version\n\n"
+                "### Post\n\nA self-contained X post.\n"
+                if format_name == "x" else "# Approved LinkedIn post\n"
+            )
+            for filename, content in (
+                ("draft-01.md", final_text),
+                ("council-01.md", "council"),
+                ("final.md", final_text),
+                ("lesson-candidates.md", "lessons"),
+            ):
+                (directory / filename).write_text(content, encoding="utf-8")
+            fmt = state["format_states"][format_name]
+            fmt.update(stage="complete", status="complete", disposition="finalized")
+            fmt["artifacts"].update(
+                draft=f"formats/{format_name}/draft-01.md",
+                council=f"formats/{format_name}/council-01.md",
+                final=f"formats/{format_name}/final.md",
+                lessons=f"formats/{format_name}/lesson-candidates.md",
+            )
+        state["status"] = "complete"
+        (run / "run.json").write_text(json.dumps(state), encoding="utf-8")
+        for format_name in ("linkedin", "x"):
+            result, _, stderr = self.run_cli(
+                "vault", "finalize-run", run.name, "--format", format_name
+            )
+            self.assertEqual((result, stderr), (0, ""))
+        metadata, body = load_item(
+            self.data_root / "vault" / "items" / f"{item_id}.md"
+        )
+        self.assertEqual(metadata["use_count"], 1)
+        self.assertEqual(
+            metadata["final_artifacts"],
+            [
+                f"runs/{run.name}/formats/linkedin/final.md",
+                f"runs/{run.name}/formats/x/final.md",
+            ],
+        )
+        self.assertIn("format linkedin", body)
+        self.assertIn("format x, variant single", body)
+        self.assertEqual(self.run_cli("vault", "validate")[0], 0)
 
     def test_refinalized_run_preserves_historical_final_without_counting_another_use(self) -> None:
         item_id = self.capture("Reopened final")
         run_path = self.start("--title", "Reopened final", "--vault-item", item_id)
         self.finalize(run_path)
 
-        (run_path / "final-02.md").write_text("# Final 02\n", encoding="utf-8")
+        (run_path / "formats" / "linkedin" / "final-02.md").write_text("# Final 02\n", encoding="utf-8")
         state_path = run_path / "run.json"
         state = json.loads(state_path.read_text(encoding="utf-8"))
-        state["artifacts"]["final"] = "final-02.md"
+        state["format_states"]["linkedin"]["artifacts"]["final"] = "formats/linkedin/final-02.md"
         state_path.write_text(json.dumps(state), encoding="utf-8")
 
         result, _, stderr = self.run_cli("vault", "finalize-run", run_path.name)
@@ -357,11 +435,14 @@ class VaultCLITests(unittest.TestCase):
         self.assertEqual(
             metadata["final_artifacts"],
             [
-                f"runs/{run_path.name}/final.md",
-                f"runs/{run_path.name}/final-02.md",
+                f"runs/{run_path.name}/formats/linkedin/final.md",
+                f"runs/{run_path.name}/formats/linkedin/final-02.md",
             ],
         )
-        self.assertEqual(load_state(run_path)["final_artifact"], "final-02.md")
+        self.assertEqual(
+            load_state(run_path)["format_states"]["linkedin"]["final_artifact"],
+            "formats/linkedin/final-02.md",
+        )
         result, _, _ = self.run_cli("vault", "validate")
         self.assertEqual(result, 0)
 
@@ -383,7 +464,7 @@ class VaultCLITests(unittest.TestCase):
         self.assertEqual(metadata["use_count"], 2)
         self.assertEqual(
             metadata["final_artifacts"],
-            [f"runs/{first.name}/final.md", f"runs/{second.name}/final.md"],
+            [f"runs/{first.name}/formats/linkedin/final.md", f"runs/{second.name}/formats/linkedin/final.md"],
         )
         result, _, _ = self.run_cli("vault", "validate")
         self.assertEqual(result, 0)
@@ -427,7 +508,7 @@ class VaultCLITests(unittest.TestCase):
         state = load_state(later)
         self.assertEqual(state["contributing_vault_items"], [item_id])
         spike = (later / "spike.md").read_text(encoding="utf-8")
-        self.assertIn(f"runs/{completed.name}/final.md", spike)
+        self.assertIn(f"runs/{completed.name}/formats/linkedin/final.md", spike)
         self.assertIn("Successful uses: 1", spike)
 
     def test_archived_item_remains_archived_when_linked_run_is_finalized(self) -> None:

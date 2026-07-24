@@ -15,7 +15,11 @@ Build useful creator context without inventing preferences.
    vault retains reusable sources, ideas, completed-artifact provenance, and parked runs;
    successful use is history rather than consumption. Do not turn setup into a vault
    questionnaire.
-2. Before any edit, list the exact paths under `<data-root>/creator` that you intend to modify. Inspect `profile.md`, `voice.md`, `lessons.md`, `sources.md`, `formats/linkedin.md`, and `formats/readme.md`; summarize populated, missing, uncertain, and conflicting fields.
+2. Before any edit, list the exact paths under `<data-root>/creator` that you intend to
+   modify. Inspect the shared files plus only the formats the human plans to use:
+   `formats/linkedin.md`, `formats/x.md`, and/or `formats/readme.md`. Initialization creates
+   any missing starters without overwriting existing guidance. Do not require configuration
+   of an unused format.
 3. Read [references/onboarding-questions.md](references/onboarding-questions.md). Ask one focused question at a time, prioritizing gaps that materially affect writing. Do not require every question.
 4. If samples are supplied, confirm they are the creator's and whether they are representative. Analyze repeated textual evidence using [references/sample-analysis.md](references/sample-analysis.md). Separate:
    - **Observed:** supported by quoted or precisely located sample evidence.
@@ -33,7 +37,15 @@ Build useful creator context without inventing preferences.
 - `lessons.md`: only individually human-approved reusable lessons, with provenance.
 - `sources.md`: permitted/preferred source types, trusted recurring sources, citation and confidentiality rules. This is not a list of invented authorities.
 - `formats/linkedin.md`: format-specific constraints and creator-approved preferences.
+- `formats/x.md`: X variant, audience, hook, density, line-break, directness, example,
+  humour, list, technical-depth, promotion, call-to-action, reply-structure, formatting,
+  and avoidance guidance.
 - `formats/readme.md`: reusable README constraints and any creator-approved README preferences.
+
+Calibrate X only from explicit preferences or located evidence in creator-owned X samples,
+LinkedIn samples, speaking transcripts, or admired examples. Label explicit preferences
+separately from observations. LinkedIn evidence may inform a proposal but never becomes an
+X rule automatically, and the two channel voices need not be identical.
 
 Use [assets/creator-starter.md](assets/creator-starter.md) as a structural fallback, not content to copy blindly. Do not modify run artifacts during setup unless explicitly asked.
 

@@ -1,31 +1,51 @@
 {
+  "schema_version": 2,
   "id": "completed-run",
   "title": "Decision logs are latency tools",
-  "format": "linkedin",
-  "stage": "complete",
+  "requested_formats": [
+    "linkedin"
+  ],
+  "primary_format": null,
+  "active_format": null,
   "status": "complete",
-  "research_required": true,
-  "revision_round": 1,
-  "pending_human_action": "none",
+  "shared_state": {
+    "stage": "complete",
+    "status": "complete",
+    "research_required": true,
+    "pending_human_action": "none"
+  },
+  "shared_artifacts": {
+    "spike": "spike.md",
+    "research": "research-report.md",
+    "interview": "interview.md",
+    "brief": "content-brief.md"
+  },
+  "format_states": {
+    "linkedin": {
+      "variant": null,
+      "angle": null,
+      "stage": "complete",
+      "status": "complete",
+      "revision_round": 1,
+      "pending_human_action": "none",
+      "disposition": "finalized",
+      "artifacts": {
+        "draft": "formats/linkedin/draft-02.md",
+        "council": "formats/linkedin/council-02.md",
+        "revision_plan": "formats/linkedin/revision-plan-01.md",
+        "revision": "formats/linkedin/draft-02.md",
+        "final": "formats/linkedin/final.md",
+        "lessons": "formats/linkedin/lesson-candidates.md",
+        "draft_1": "formats/linkedin/draft-01.md",
+        "council_1": "formats/linkedin/council-01.md"
+      },
+      "final_artifact": "formats/linkedin/final.md"
+    }
+  },
   "origin_vault_items": [],
   "contributing_vault_items": [],
   "derived_vault_items": [],
   "linked_vault_items": [],
   "parking_reason": null,
-  "parked_at": null,
-  "final_artifact": "final.md",
-  "artifacts": {
-    "spike": "spike.md",
-    "research": "research-report.md",
-    "interview": "interview.md",
-    "brief": "content-brief.md",
-    "draft": "draft-02.md",
-    "draft_1": "draft-01.md",
-    "council": "council-02.md",
-    "council_1": "council-01.md",
-    "revision_plan": "revision-plan-01.md",
-    "revision": "draft-02.md",
-    "final": "final.md",
-    "lessons": "lesson-candidates.md"
-  }
+  "parked_at": null
 }

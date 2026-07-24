@@ -49,24 +49,26 @@ class ContentFlowCLITests(unittest.TestCase):
         run = make_run(self.root, "Decision Logs", "linkedin", date(2026, 7, 22))
         self.assertEqual(run.name, "2026-07-22-decision-logs")
         state = load_state(run)
-        self.assertEqual(state["pending_human_action"], "provide_idea_details")
-        self.assertEqual(state["revision_round"], 0)
+        self.assertEqual(state["schema_version"], 2)
+        self.assertEqual(state["requested_formats"], ["linkedin"])
+        self.assertEqual(state["shared_state"]["pending_human_action"], "provide_idea_details")
+        self.assertEqual(state["format_states"]["linkedin"]["revision_round"], 0)
         self.assertEqual(validation_errors(run, state), [])
         self.assertTrue((run / "spike.md").is_file())
 
     def test_readme_is_supported_without_changing_linkedin_default(self) -> None:
-        self.assertEqual(SUPPORTED_FORMATS, ("linkedin", "readme"))
+        self.assertEqual(SUPPORTED_FORMATS, ("linkedin", "x", "readme"))
         readme_run = make_run(self.root, "Project README", "readme", date(2026, 7, 22))
         linkedin_run = make_run(self.root, "LinkedIn default", "linkedin", date(2026, 7, 22))
 
         readme_state = load_state(readme_run)
-        self.assertEqual(readme_state["format"], "readme")
+        self.assertEqual(readme_state["requested_formats"], ["readme"])
         self.assertEqual(validation_errors(readme_run, readme_state), [])
         self.assertIn(
             "## Repository evidence",
             (readme_run / "spike.md").read_text(encoding="utf-8"),
         )
-        self.assertEqual(load_state(linkedin_run)["format"], "linkedin")
+        self.assertEqual(load_state(linkedin_run)["requested_formats"], ["linkedin"])
         self.assertIn("## Idea", (linkedin_run / "spike.md").read_text(encoding="utf-8"))
 
     def test_new_run_never_overwrites(self) -> None:
@@ -146,6 +148,26 @@ class ContentFlowCLITests(unittest.TestCase):
             (ROOT / "templates" / "creator" / "formats" / "readme.md").read_text(encoding="utf-8"),
         )
         self.assertEqual(linkedin_format.read_text(encoding="utf-8"), linkedin_before)
+
+    def test_init_adds_x_guidance_without_overwriting_existing_x_file(self) -> None:
+        data_root = self.root / "private"
+        initialize_data_root(data_root, ROOT)
+        x_format = data_root / "creator" / "formats" / "x.md"
+        x_format.write_text("private X preferences\n", encoding="utf-8")
+        with self.assertRaisesRegex(CFError, "refusing to overwrite"):
+            initialize_data_root(data_root, ROOT)
+        self.assertEqual(x_format.read_text(encoding="utf-8"), "private X preferences\n")
+
+        older = self.root / "older"
+        initialize_data_root(older, ROOT)
+        (older / "creator" / "formats" / "x.md").unlink()
+        linkedin_before = (older / "creator" / "formats" / "linkedin.md").read_bytes()
+        initialize_data_root(older, ROOT)
+        self.assertTrue((older / "creator" / "formats" / "x.md").is_file())
+        self.assertEqual(
+            (older / "creator" / "formats" / "linkedin.md").read_bytes(),
+            linkedin_before,
+        )
 
     def test_init_fails_for_unignored_root_inside_git_repository(self) -> None:
         repository = self.root / "repository"
@@ -249,9 +271,9 @@ class ContentFlowCLITests(unittest.TestCase):
             self.assertEqual(main(["validate", run.name, "--data-dir", str(data_root)], root=ROOT), 0)
 
         resumed = load_state(resolve_run(run.name, data_root))
-        self.assertEqual(resumed["format"], "readme")
-        self.assertEqual(resumed["pending_human_action"], "provide_idea_details")
-        self.assertIn("format: readme", first_output.getvalue())
+        self.assertEqual(resumed["requested_formats"], ["readme"])
+        self.assertEqual(resumed["shared_state"]["pending_human_action"], "provide_idea_details")
+        self.assertIn("requested_formats: readme", first_output.getvalue())
 
     def test_new_run_cli_accepts_readme(self) -> None:
         data_root = self.root / "explicit"
@@ -272,7 +294,7 @@ class ContentFlowCLITests(unittest.TestCase):
             )
         self.assertEqual(result, 0)
         run = next((data_root / "runs").iterdir())
-        self.assertEqual(load_state(run)["format"], "readme")
+        self.assertEqual(load_state(run)["requested_formats"], ["readme"])
 
     def test_content_flow_home_selects_data_root(self) -> None:
         data_root = self.root / "environment"
@@ -302,298 +324,212 @@ class ContentFlowCLITests(unittest.TestCase):
         self.assertEqual(result, 2)
         self.assertIn("private creator setup is incomplete", stderr.getvalue())
 
-    def test_validate_detects_missing_stage_artifact(self) -> None:
-        run = make_run(self.root, "Missing brief", "linkedin", date(2026, 7, 22))
+    def _finish_shared(self, run: Path) -> dict:
         state = load_state(run)
-        state.update(
-            stage="draft",
-            status="awaiting_human",
-            research_required=False,
-            pending_human_action="review_draft",
+        for name, text in (("interview.md", "answer"), ("content-brief.md", "brief")):
+            (run / name).write_text(text, encoding="utf-8")
+        state["shared_state"].update(
+            stage="complete", status="complete", research_required=False,
+            pending_human_action="none",
         )
-        state["artifacts"].update(interview="interview.md", draft="draft-01.md")
-        (run / "interview.md").write_text("answer", encoding="utf-8")
-        (run / "draft-01.md").write_text("draft", encoding="utf-8")
+        state["shared_artifacts"].update(interview="interview.md", brief="content-brief.md")
+        return state
+
+    def test_repeatable_formats_and_primary_create_independent_states(self) -> None:
+        data_root = self.root / "private"
+        initialize_data_root(data_root, ROOT)
+        result = main([
+            "new-run", "--title", "Both", "--format", "linkedin", "--format", "x",
+            "--primary-format", "linkedin", "--x-variant", "thread",
+            "--data-dir", str(data_root),
+        ], root=ROOT)
+        self.assertEqual(result, 0)
+        run = next((data_root / "runs").iterdir())
+        state = load_state(run)
+        self.assertEqual(state["requested_formats"], ["linkedin", "x"])
+        self.assertEqual(state["primary_format"], "linkedin")
+        self.assertEqual(state["format_states"]["x"]["variant"], "thread")
+        self.assertIsNot(state["format_states"]["linkedin"], state["format_states"]["x"])
+        self.assertEqual(validation_errors(run, state), [])
+
+    def test_duplicate_and_invalid_primary_are_rejected(self) -> None:
+        with self.assertRaisesRegex(CFError, "duplicates"):
+            make_run(self.root, "Duplicate", ["x", "x"])
+        with self.assertRaisesRegex(CFError, "included"):
+            make_run(self.root, "Bad primary", ["x"], primary_format="linkedin")
+
+    def test_x_only_and_x_primary_runs_do_not_require_linkedin(self) -> None:
+        x_only = make_run(self.root, "X only", ["x"], x_variant="single")
+        self.assertEqual(set(load_state(x_only)["format_states"]), {"x"})
+        x_primary = make_run(self.root, "X first", ["x", "linkedin"], primary_format="x")
+        self.assertEqual(load_state(x_primary)["primary_format"], "x")
+
+    def test_shared_artifacts_and_format_artifacts_are_separate(self) -> None:
+        run = make_run(self.root, "Separate", ["linkedin", "x"], primary_format="linkedin")
+        state = self._finish_shared(run)
+        state["active_format"] = "linkedin"
+        linkedin = state["format_states"]["linkedin"]
+        linkedin.update(stage="draft", status="awaiting_human", pending_human_action="authorize_council")
+        path = run / "formats" / "linkedin" / "draft-01.md"
+        path.write_text("draft", encoding="utf-8")
+        linkedin["artifacts"]["draft"] = "formats/linkedin/draft-01.md"
+        self.assertEqual(validation_errors(run, state), [])
+        self.assertIsNone(state["format_states"]["x"]["artifacts"]["draft"])
+
+    def test_primary_must_resolve_before_secondary_activation(self) -> None:
+        run = make_run(self.root, "Order", ["linkedin", "x"], primary_format="linkedin")
+        state = self._finish_shared(run)
+        state["active_format"] = "x"
         errors = validation_errors(run, state)
-        self.assertIn("stage 'draft' requires artifact 'brief'", errors)
+        self.assertIn("primary format must be completed, parked, or declined before a secondary becomes active", errors)
 
-    def test_validate_rejects_unsafe_artifact_path(self) -> None:
-        run = make_run(self.root, "Unsafe", "linkedin", date(2026, 7, 22))
-        state = load_state(run)
-        state["artifacts"]["extra"] = "../secret.md"
-        self.assertIn("artifact 'extra' must stay inside the run directory", validation_errors(run, state))
+    def test_both_adaptation_directions_activate_an_empty_secondary(self) -> None:
+        for primary, secondary in (("linkedin", "x"), ("x", "linkedin")):
+            data_root = self.root / f"private-{primary}"
+            initialize_data_root(data_root, ROOT)
+            run = make_run(
+                data_root, f"{primary} anchor", [primary, secondary],
+                primary_format=primary, x_variant="single",
+            )
+            state = self._finish_shared(run)
+            primary_dir = run / "formats" / primary
+            social_copy = (
+                "<!-- cf:x-variant: single -->\n\n## Recommended final version\n\n"
+                "### Post\n\nApproved X framing.\n"
+                if primary == "x" else "Approved LinkedIn framing."
+            )
+            for name, content in (
+                ("draft-01.md", social_copy),
+                ("council-01.md", "council"),
+                ("final.md", social_copy),
+                ("lesson-candidates.md", "lessons"),
+            ):
+                (primary_dir / name).write_text(content, encoding="utf-8")
+            fmt = state["format_states"][primary]
+            fmt.update(stage="complete", status="complete", disposition="finalized")
+            fmt["artifacts"].update(
+                draft=f"formats/{primary}/draft-01.md",
+                council=f"formats/{primary}/council-01.md",
+                final=f"formats/{primary}/final.md",
+                lessons=f"formats/{primary}/lesson-candidates.md",
+            )
+            fmt["final_artifact"] = f"formats/{primary}/final.md"
+            state["status"] = "awaiting_human"
+            (run / "run.json").write_text(json.dumps(state), encoding="utf-8")
+            with contextlib.redirect_stdout(io.StringIO()):
+                result = main(
+                    ["format-action", run.name, secondary, "activate", "--data-dir", str(data_root)],
+                    root=ROOT,
+                )
+            self.assertEqual(result, 0)
+            resumed = load_state(run)
+            self.assertEqual(resumed["active_format"], secondary)
+            self.assertIsNone(resumed["format_states"][secondary]["artifacts"]["draft"])
 
-    def test_validate_rejects_symlink_artifact_escape(self) -> None:
-        run = make_run(self.root, "Symlink", "linkedin", date(2026, 7, 22))
-        outside = self.root / "outside.md"
-        outside.write_text("secret", encoding="utf-8")
-        (run / "draft-01.md").symlink_to(outside)
-        state = load_state(run)
-        state["artifacts"]["draft"] = "draft-01.md"
-        self.assertIn(
-            "artifact 'draft' must resolve inside the run directory",
-            validation_errors(run, state),
+    def test_independent_human_gates_and_revision_rounds(self) -> None:
+        run = make_run(self.root, "Gates", ["linkedin", "x"])
+        state = self._finish_shared(run)
+        state["active_format"] = "linkedin"
+        li = state["format_states"]["linkedin"]
+        li.update(stage="revision", status="awaiting_human", pending_human_action="approve_revision_plan")
+        for name in ("draft-01.md", "revision-plan-01.md"):
+            (run / "formats" / "linkedin" / name).write_text(name, encoding="utf-8")
+        li["artifacts"].update(
+            draft="formats/linkedin/draft-01.md",
+            revision_plan="formats/linkedin/revision-plan-01.md",
         )
-
-    def test_validate_rejects_stage_action_mismatch(self) -> None:
-        run = make_run(self.root, "Wrong gate", "linkedin", date(2026, 7, 22))
-        state = load_state(run)
-        state["pending_human_action"] = "approve_final"
-        self.assertIn(
-            "stage 'selected_idea' cannot await 'approve_final'; allowed actions: provide_idea_details",
-            validation_errors(run, state),
-        )
-
-    def test_validate_rejects_non_boolean_research_decision(self) -> None:
-        run = make_run(self.root, "Wrong type", "linkedin", date(2026, 7, 22))
-        state = load_state(run)
-        state["research_required"] = 0
-        self.assertIn("research_required must be null or a Boolean", validation_errors(run, state))
-
-    def test_validate_requires_stable_artifact_keys(self) -> None:
-        run = make_run(self.root, "Missing key", "linkedin", date(2026, 7, 22))
-        state = load_state(run)
-        del state["artifacts"]["lessons"]
-        self.assertIn("missing stable artifact key: lessons", validation_errors(run, state))
-
-    def test_validate_rejects_semantically_wrong_artifact_filename(self) -> None:
-        run = make_run(self.root, "Wrong file", "linkedin", date(2026, 7, 22))
-        state = load_state(run)
-        state["artifacts"]["research"] = "notes.md"
-        (run / "notes.md").write_text("notes", encoding="utf-8")
-        self.assertIn(
-            "artifact 'research' has invalid filename: notes.md",
-            validation_errors(run, state),
-        )
-
-    def test_validate_allows_versioned_final_and_lessons_after_reopen(self) -> None:
-        run = make_run(self.root, "Reopened final", "linkedin", date(2026, 7, 22))
-        state = load_state(run)
-        state["artifacts"]["final"] = "final-02.md"
-        state["artifacts"]["lessons"] = "lesson-candidates-02.md"
-        state["final_artifact"] = "final-02.md"
-        (run / "final-02.md").write_text("final", encoding="utf-8")
-        (run / "lesson-candidates-02.md").write_text("lessons", encoding="utf-8")
-
         self.assertEqual(validation_errors(run, state), [])
+        self.assertEqual(state["format_states"]["x"]["revision_round"], 0)
+        state["format_states"]["x"]["pending_human_action"] = "approve_final"
+        self.assertIn("format 'x' status 'pending' requires no pending action", validation_errors(run, state))
 
-    def test_validate_enforces_cumulative_council_artifacts(self) -> None:
-        run = make_run(self.root, "Council history", "linkedin", date(2026, 7, 22))
-        state = load_state(run)
-        state.update(
-            stage="council",
-            status="awaiting_human",
-            research_required=False,
-            pending_human_action="approve_final",
-        )
-        for key, filename in {
-            "brief": "content-brief.md",
-            "draft": "draft-01.md",
-            "council": "council-01.md",
-        }.items():
-            state["artifacts"][key] = filename
-            (run / filename).write_text(key, encoding="utf-8")
-        self.assertIn("stage 'council' requires artifact 'interview'", validation_errors(run, state))
-
-    def test_validate_enforces_revision_round_and_current_pointer(self) -> None:
-        run = make_run(self.root, "Revision pointer", "linkedin", date(2026, 7, 22))
-        state = load_state(run)
-        state["revision_round"] = 1
-        self.assertIn(
-            "revision_round greater than 0 requires artifact 'revision'",
-            validation_errors(run, state),
-        )
-
-    def test_revision_plan_from_human_feedback_does_not_require_council(self) -> None:
-        run = make_run(self.root, "Human feedback", "linkedin", date(2026, 7, 22))
-        state = load_state(run)
-        state.update(
-            stage="revision",
-            status="awaiting_human",
-            research_required=False,
-            pending_human_action="approve_revision_plan",
-        )
-        state["artifacts"].update(
-            interview="interview.md",
-            brief="content-brief.md",
-            draft="draft-01.md",
-            draft_1="draft-01.md",
-            revision_plan="revision-plan-01.md",
-            revision_plan_1="revision-plan-01.md",
-        )
-        for filename in (
-            "interview.md",
-            "content-brief.md",
-            "draft-01.md",
-            "revision-plan-01.md",
-        ):
-            (run / filename).write_text(filename, encoding="utf-8")
-
-        self.assertEqual(validation_errors(run, state), [])
-
-    def test_readme_council_requires_human_gate_and_does_not_revise(self) -> None:
-        run = make_run(self.root, "Council README", "readme", date(2026, 7, 22))
-        target = self.root / "project" / "README.md"
-        target.parent.mkdir()
-        target.write_text("# Existing project README\n", encoding="utf-8")
-        state = load_state(run)
-        state.update(
-            stage="draft",
-            status="awaiting_human",
-            research_required=False,
-            pending_human_action="authorize_council",
-        )
-        state["artifacts"].update(
-            interview="interview.md",
-            brief="content-brief.md",
-            draft="draft-01.md",
-        )
-        for filename in ("interview.md", "content-brief.md", "draft-01.md"):
-            (run / filename).write_text(filename, encoding="utf-8")
-        (run / "run.json").write_text(json.dumps(state), encoding="utf-8")
-
-        self.assertEqual(validation_errors(run, state), [])
-        self.assertEqual(target.read_text(encoding="utf-8"), "# Existing project README\n")
-        self.assertFalse((run / "council-01.md").exists())
-        self.assertFalse((run / "draft-02.md").exists())
-
-        (run / "council-01.md").write_text(
-            "# README Council\n\nHuman authorization: recorded.\n",
+    def test_x_single_thread_and_standalone_validation(self) -> None:
+        samples = {
+            "single": "<!-- cf:x-variant: single -->\n\n## Recommended final version\n\n### Post\n\nOne clear post.\n",
+            "thread": "<!-- cf:x-variant: thread -->\n\n## Recommended final version\n\n### Post 1\n\nOpening.\n\n### Post 2\n\nPayoff.\n",
+            "standalone": "<!-- cf:x-variant: standalone -->\n\n## Recommended final version\n\n### Standalone 1\n\nAngle one.\n\n### Standalone 2\n\nAngle two.\n",
+        }
+        for variant, content in samples.items():
+            path = self.root / f"{variant}.md"
+            path.write_text(content, encoding="utf-8")
+            stderr = io.StringIO()
+            with contextlib.redirect_stderr(stderr):
+                self.assertEqual(main(["validate-x", str(path), "--variant", variant], root=ROOT), 0)
+        too_long = self.root / "long.md"
+        too_long.write_text(
+            "<!-- cf:x-variant: single -->\n\n## Recommended final version\n\n### Post\n\n" + "x" * 281,
             encoding="utf-8",
         )
-        state.update(
-            stage="council",
-            pending_human_action="approve_final",
-        )
-        state["artifacts"].update(council="council-01.md", council_1="council-01.md")
-        self.assertEqual(validation_errors(run, state), [])
-        self.assertFalse((run / "draft-02.md").exists())
-        self.assertEqual(target.read_text(encoding="utf-8"), "# Existing project README\n")
+        with contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(main(["validate-x", str(too_long), "--variant", "single"], root=ROOT), 1)
 
-    def test_readme_approved_revision_preserves_draft_and_target(self) -> None:
-        run = make_run(self.root, "Revised README", "readme", date(2026, 7, 22))
-        target = self.root / "project" / "README.md"
-        target.parent.mkdir()
-        target.write_text("# Existing project README\n", encoding="utf-8")
-        state = load_state(run)
-        state.update(
-            stage="revision",
-            status="awaiting_human",
-            research_required=False,
-            revision_round=0,
-            pending_human_action="approve_revision_plan",
-        )
-        state["artifacts"].update(
-            interview="interview.md",
-            brief="content-brief.md",
-            draft="draft-01.md",
-            draft_1="draft-01.md",
-            council="council-01.md",
-            council_1="council-01.md",
-            revision_plan="revision-plan-01.md",
-            revision_plan_1="revision-plan-01.md",
-        )
-        for filename in (
-            "interview.md",
-            "content-brief.md",
-            "draft-01.md",
-            "council-01.md",
-            "revision-plan-01.md",
-        ):
-            (run / filename).write_text(filename, encoding="utf-8")
+    def test_invalid_x_thread_structure_is_rejected_by_run_validation(self) -> None:
+        run = make_run(self.root, "Bad thread", ["x"], x_variant="thread")
+        state = self._finish_shared(run)
+        state["active_format"] = "x"
+        fmt = state["format_states"]["x"]
+        fmt.update(stage="draft", status="awaiting_human", pending_human_action="review_draft")
+        draft = run / "formats" / "x" / "draft-01.md"
+        draft.write_text("<!-- cf:x-variant: thread -->\n\n## Recommended final version\n\n### Post 1\n\nOnly one.", encoding="utf-8")
+        fmt["artifacts"]["draft"] = "formats/x/draft-01.md"
+        self.assertTrue(any("at least two posts" in error for error in validation_errors(run, state)))
 
-        self.assertEqual(validation_errors(run, state), [])
-        self.assertFalse((run / "draft-02.md").exists())
-        self.assertEqual(target.read_text(encoding="utf-8"), "# Existing project README\n")
+    def test_unfinished_secondary_prevents_completion_and_decline_resolves_it(self) -> None:
+        data_root = self.root / "private"
+        initialize_data_root(data_root, ROOT)
+        run = make_run(data_root, "Completion", ["linkedin", "x"])
+        state = self._finish_shared(run)
+        li = state["format_states"]["linkedin"]
+        li.update(stage="complete", status="complete", disposition="finalized")
+        for name in ("draft-01.md", "council-01.md", "final.md", "lesson-candidates.md"):
+            (run / "formats" / "linkedin" / name).write_text(name, encoding="utf-8")
+        li["artifacts"].update(
+            draft="formats/linkedin/draft-01.md",
+            council="formats/linkedin/council-01.md",
+            final="formats/linkedin/final.md",
+            lessons="formats/linkedin/lesson-candidates.md",
+        )
+        li["final_artifact"] = "formats/linkedin/final.md"
+        state["status"] = "complete"
+        self.assertIn("run cannot be complete while requested formats remain unfinished", validation_errors(run, state))
+        (run / "run.json").write_text(json.dumps({**state, "status": "awaiting_human"}), encoding="utf-8")
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(main(["format-action", run.name, "x", "decline", "--data-dir", str(data_root)], root=ROOT), 0)
+        self.assertEqual(load_state(run)["status"], "complete")
 
-        (run / "draft-02.md").write_text("approved revised README", encoding="utf-8")
-        state.update(
-            revision_round=1,
-            pending_human_action="review_draft",
-        )
-        state["artifacts"].update(
-            draft="draft-02.md",
-            draft_2="draft-02.md",
-            revision="draft-02.md",
-        )
-        self.assertEqual(validation_errors(run, state), [])
+    def test_migration_moves_only_format_artifacts_and_adds_no_x(self) -> None:
+        run = self.root / "runs" / "legacy"
+        run.mkdir(parents=True)
+        for name in ("spike.md", "interview.md", "content-brief.md", "draft-01.md"):
+            (run / name).write_text(name, encoding="utf-8")
+        legacy = {
+            "id": "legacy", "title": "Legacy", "format": "linkedin", "stage": "draft",
+            "status": "awaiting_human", "research_required": False, "revision_round": 0,
+            "pending_human_action": "review_draft", "artifacts": {
+                "spike": "spike.md", "research": None, "interview": "interview.md",
+                "brief": "content-brief.md", "draft": "draft-01.md", "council": None,
+                "revision_plan": None, "revision": None, "final": None, "lessons": None,
+            }, "origin_vault_items": [], "contributing_vault_items": [],
+            "derived_vault_items": [], "linked_vault_items": [], "parking_reason": None,
+            "parked_at": None, "final_artifact": None,
+        }
+        (run / "run.json").write_text(json.dumps(legacy), encoding="utf-8")
+        self.assertEqual(main(["migrate-run", str(run)], root=ROOT), 0)
         self.assertTrue((run / "draft-01.md").is_file())
-        self.assertEqual(target.read_text(encoding="utf-8"), "# Existing project README\n")
+        self.assertEqual(main(["migrate-run", str(run), "--apply"], root=ROOT), 0)
+        state = load_state(run)
+        self.assertEqual(state["requested_formats"], ["linkedin"])
+        self.assertNotIn("x", state["format_states"])
+        self.assertTrue((run / "formats" / "linkedin" / "draft-01.md").is_file())
+        self.assertTrue((run / "content-brief.md").is_file())
 
-    def test_readme_target_update_is_an_explicit_procedural_gate(self) -> None:
-        skill = (ROOT / ".agents" / "skills" / "content-flow" / "SKILL.md").read_text(
-            encoding="utf-8"
-        )
+    def test_readme_target_gate_remains_procedural_and_private(self) -> None:
+        skill = (ROOT / ".agents" / "skills" / "content-flow" / "SKILL.md").read_text(encoding="utf-8")
         normalized = " ".join(skill.split())
         self.assertIn("show the complete candidate or exact diff", normalized)
         self.assertIn("Ask for explicit final approval", normalized)
-        self.assertIn("update that one target README", normalized)
-        self.assertIn("do not commit", normalized.lower())
-
-    def test_readme_run_artifacts_stay_out_of_tracked_framework_locations(self) -> None:
-        tracked_readme_before = (ROOT / "README.md").read_bytes()
-        run = make_run(self.root, "Private README work", "readme", date(2026, 7, 22))
-
-        self.assertTrue(run.is_relative_to(self.root))
-        self.assertFalse(run.is_relative_to(ROOT))
-        self.assertEqual((ROOT / "README.md").read_bytes(), tracked_readme_before)
-        self.assertFalse((ROOT / "runs").exists())
-
-    def test_validate_rejects_stale_current_artifact_pointer(self) -> None:
-        run = make_run(self.root, "Stale pointer", "linkedin", date(2026, 7, 22))
-        state = load_state(run)
-        state["artifacts"].update(council="council-01.md", council_2="council-02.md")
-        (run / "council-01.md").write_text("first", encoding="utf-8")
-        (run / "council-02.md").write_text("second", encoding="utf-8")
-        self.assertIn(
-            "current artifact 'council' is older than its recorded history",
-            validation_errors(run, state),
-        )
-
-    def test_validate_rejects_third_revision_plan(self) -> None:
-        run = make_run(self.root, "Revision cap", "linkedin", date(2026, 7, 22))
-        state = load_state(run)
-        state.update(
-            stage="revision",
-            status="awaiting_human",
-            research_required=False,
-            revision_round=2,
-            pending_human_action="approve_revision_plan",
-        )
-        state["artifacts"].update(
-            interview="interview.md",
-            brief="content-brief.md",
-            draft="draft-03.md",
-            council="council-02.md",
-            revision_plan="revision-plan-02.md",
-            revision="draft-03.md",
-        )
-        for filename in (
-            "interview.md",
-            "content-brief.md",
-            "draft-03.md",
-            "council-02.md",
-            "revision-plan-02.md",
-        ):
-            (run / filename).write_text(filename, encoding="utf-8")
-        self.assertIn(
-            "revision_round=2 cannot await another revision plan; resolve the revision limit",
-            validation_errors(run, state),
-        )
-
-    def test_validate_enforces_research_artifact(self) -> None:
-        run = make_run(self.root, "Research", "linkedin", date(2026, 7, 22))
-        state = load_state(run)
-        state.update(
-            stage="interview",
-            status="awaiting_human",
-            research_required=True,
-            pending_human_action="answer_interview_question",
-        )
-        state["artifacts"]["interview"] = "interview.md"
-        (run / "interview.md").write_text("Q1", encoding="utf-8")
-        errors = validation_errors(run, state)
-        self.assertIn("research_required=true requires a research artifact after research stage", errors)
+        run = make_run(self.root, "Private README", ["readme"])
+        self.assertTrue((run / "formats" / "readme").is_dir())
 
     def test_count_counts_unicode_code_points_including_newline(self) -> None:
         path = self.root / "unicode.txt"

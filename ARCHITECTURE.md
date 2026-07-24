@@ -24,10 +24,12 @@ The **procedure** lives in `AGENTS.md`, `WORKFLOW.md`, and the two repository sk
 
 `run.json` aids resumption; it is not a workflow engine. An artifact holds substance while state points to it. A private data root may be unversioned or separately versioned; the framework repository never needs to track it.
 
-The `format` field selects reusable guidance without selecting a different engine.
-`linkedin` and `readme` share the same state and artifacts. The active
-`creator/formats/<format>.md` specializes inspection, briefing, drafting, Council lenses,
-and final handling.
+Schema version 2 separates shared content development from channel rendering.
+`requested_formats` is ordered, `primary_format` is optional, shared research/interview/
+brief state appears once, and `format_states` owns independent LinkedIn, X, or README
+rendering state. Social format artifacts live under `formats/<format>/`. README keeps its
+repository-document overlay. Adding a future renderer means another format state and
+guidance file, not another research/interview engine.
 
 The **vault** is persistent intake and incubation: material may exist without a run and may
 survive several development attempts. A **run** is one bounded attempt to develop selected
@@ -49,6 +51,13 @@ items may support multiple runs; runs produce completed assets; and an item carr
 completed-asset reference may contribute to a later run. Run roles distinguish direct
 origins, supporting contributors, and ideas derived during development.
 
+A linked adaptation run adds an `adaptation` provenance record rather than mutating an
+approved source run. It records the selected source run, format, artifact and SHA-256,
+available original final, destination format/variant, originating vault items, and prior
+adaptation runs. Reusable shared evidence is copied mechanically into the new private run;
+the source remains the immutable historical record. Repeating the same adaptation creates
+a collision-safe new run and preserves every earlier output.
+
 ## Responsibilities
 
 ### Model judgment
@@ -60,7 +69,12 @@ Codex decides whether research is warranted, adapts interview questions to missi
 The standard-library CLI resolves the data root, initializes private structure, checks
 Git-ignore safety, creates collision-safe vault items and runs, maintains bidirectional
 relationships and the generated index, parks/resumes run state, validates paths and state,
-reports status, and counts Unicode code points. It does not summarize or score ideas.
+reports per-format status, performs deterministic index-on-read lexical source discovery,
+initializes linked adaptation provenance, validates canonical X post structure and Unicode
+character limits, migrates singular runs, and counts Unicode code points. Discovery uses
+titles, aliases, phrases, topic words, modest spelling variation, format/finalization, and
+artifact dates; it has no embeddings, persistent index, or database. The CLI does not
+summarize, perform editorial adaptation, choose variants, or score ideas.
 README repository inspection, adaptive interviewing, drafting, review, and approval remain
 Codex procedure rather than new CLI subcommands.
 

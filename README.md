@@ -1,7 +1,7 @@
 # Content Flow v0
 
 Content Flow is a reusable, local-first Codex framework for developing human-approved
-content. Its initial formats are LinkedIn posts and project READMEs. The tracked repository
+content. Its initial formats are LinkedIn posts, X posts/threads, and project READMEs. The tracked repository
 contains workflow instructions, deterministic tooling, blank templates, tests, and
 fictional examples. Active creator context and real work stay in an ignored private data
 root.
@@ -75,8 +75,49 @@ changes status automatically.
 
 ## Start a run
 
+For existing content, the primary interface is a short conversational request to
+`$content-flow`:
+
+```text
+Let's adapt the Bostrom post for X.
+Turn my latest LinkedIn post into an X thread.
+Create three standalone X posts from the agent-first piece.
+Create the LinkedIn version of the X thread we finished yesterday.
+```
+
+Content Flow searches the active private root, briefly names the selected source, and asks
+one concise question only when the source or destination is genuinely ambiguous. If X is
+requested without a variant, it recommends a single post, thread, or several standalone
+posts from the material and asks for confirmation. It then reuses the original brief,
+research, interview, final approved source rendering, and linked vault provenance while
+drafting natively for the destination. Source finals remain unchanged; every destination
+keeps its own draft review, Council, revision, final approval, and lesson gates.
+
+When destination-platform evidence is sparse, Content Flow says that voice calibration is
+still tentative, uses the creator's general voice plus established platform constraints,
+and does not invent or persist preferences.
+
+For mechanical troubleshooting and reference, the underlying commands are:
+
+```bash
+bin/cf find "Bostrom"
+bin/cf find "my latest LinkedIn post" --json
+bin/cf adapt run:<run-id>:linkedin:final --to x --x-variant thread
+```
+
+`find` performs deterministic index-on-read lexical ranking over private run/vault
+metadata and artifacts. It supports partial titles, recognizable phrases, modest spelling
+variation, explicit drafts, formats, and recency; it adds no database, embeddings, or
+semantic-vector infrastructure. `adapt` creates a new linked destination run when an
+existing requested format cannot safely be activated.
+
+For a new idea rather than existing content, use the ordinary run initializer:
+
 ```bash
 bin/cf new-run --title "Why small teams need decision logs" --format linkedin
+bin/cf new-run --title "Why small teams need decision logs" --format x --x-variant single
+bin/cf new-run --title "Why small teams need decision logs" \
+  --format linkedin --format x --primary-format linkedin
 bin/cf new-run --title "Improve the project README" --format readme
 bin/cf new-run --vault-item <item-id>
 bin/cf new-run --vault-item <origin-id> --contributing-vault-item <source-id>
@@ -96,6 +137,13 @@ Real spikes and runs are written only under the active private root. `examples/`
 
 Selecting a vault item changes it to `developing`, links both sides, and preserves item
 provenance in `spike.md`. Multiple items may contribute to one run.
+
+Social runs research and interview once, then create one channel-neutral content brief.
+Each requested format has independent drafts, Council authorization, revisions, final
+approval, lessons, and a final artifact under `formats/<format>/`. A primary is rendered
+first; secondary adaptation reloads shared substance and destination guidance rather than
+mechanically shortening the primary. X supports `single`, `thread`, and multiple
+`standalone` posts.
 
 A README run uses the same research decision, adaptive one-question-at-a-time interview,
 content brief, draft, authorized Council review, approved revision, final approval, and
@@ -117,7 +165,7 @@ bin/cf vault resume-run <run-id>
 Parking preserves the entire run. An originating item is updated rather than duplicated;
 an unlinked run creates one `run-fragment`. Parking preserves prior successful uses and
 records the assessment for later mining. When a final artifact exists,
-`bin/cf vault finalize-run <run-id>` records successful history for each linked origin,
+`bin/cf vault finalize-run <run-id> --format <format>` records successful history for each linked origin,
 contributor, and derived idea. Non-archived items normally return to `ready`; another
 unfinished active run keeps them `developing`.
 
@@ -158,8 +206,8 @@ lineage model and validation rules.
 ```bash
 python3 -m unittest discover -s tests -v
 bin/cf validate examples/completed-run
-bin/cf count examples/completed-run/final.md
-bin/cf count examples/completed-run/final.md --section "Approved post"
+bin/cf count examples/completed-run/formats/linkedin/final.md
+bin/cf count examples/completed-run/formats/linkedin/final.md --section "Approved post"
 ```
 
 See `WORKFLOW.md` for stage contracts, `ARCHITECTURE.md` for design boundaries, and `ACCEPTANCE.md` for verifiable completion criteria.

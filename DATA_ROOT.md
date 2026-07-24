@@ -34,6 +34,7 @@ The private layout is:
 │   ├── sources.md
 │   └── formats/
 │       ├── linkedin.md
+│       ├── x.md
 │       └── readme.md
 ├── vault/
 │   ├── items/
@@ -51,6 +52,14 @@ ignored. The default `.content-flow/` path is ignored by this repository.
 `vault/items/*.md` are canonical, independently readable records. `vault/assets/<item-id>/`
 is optional supporting material, created only when useful material is actually available.
 `vault/index.md` is generated from item frontmatter and is never canonical.
+
+Within a social run, shared `spike.md`, research, interview, and `content-brief.md` live
+once at the run root. Independent drafts, Councils, revisions, finals, and lessons live
+under `runs/<id>/formats/<format>/`. README-only runs use the same schema and retain their
+document-specific procedure. Deterministic source discovery reads only this active private
+root. Linked adaptation runs, copied shared evidence, source hashes, and provenance also
+remain under it; no search result or adaptation artifact is written into tracked framework
+paths.
 
 Do not store credentials, API keys, cookies, authentication tokens, or other secrets in creator source files. Source guidance should contain policies and non-secret references only.
 

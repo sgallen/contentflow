@@ -17,7 +17,14 @@ Run commands from the repository root.
 - [ ] Orchestration reports the root, fails clearly before private setup, and stores real vault/run artifacts only under it.
 - [ ] Research remains conditional; interview, Council, revision, finalization, and lessons retain human gates.
 - [ ] Natural-language quick/enriched capture, vault selection, parking, resume, and linked finalization preserve their documented gates and provenance.
-- [ ] LinkedIn and README use one workflow and artifact model; README adds repository
+- [ ] “Let's adapt the Bostrom post for X” is sufficient: the skill resolves and briefly
+  names one clear private source, asks one concise question for genuine ambiguity, and
+  requests a phrase/title/link/date rather than guessing when no credible match exists.
+- [ ] An unspecified X destination receives a material-based variant recommendation and
+  human confirmation; sparse X evidence is labeled as calibration rather than invented
+  preference.
+- [ ] LinkedIn, X, and README use one workflow and artifact model; shared social
+  development occurs once and each renderer has independent state and approval. README adds repository
   inspection, adaptive interviewing, format-specific briefing/drafting, and the six
   specified Council lenses without a separate agent or engine.
 - [ ] README Council and revision remain human-triggered, and no target README changes
@@ -32,7 +39,7 @@ python3 /home/barney/.codex/skills/.system/skill-creator/scripts/quick_validate.
 
 ## CLI and state
 
-- [ ] `bin/cf init` creates both creator format files, `vault/items/`, `vault/assets/`,
+- [ ] `bin/cf init` creates all three creator format files, `vault/items/`, `vault/assets/`,
   generated `vault/index.md`, and `runs/` without overwriting; it can add a missing README
   format to an older private root.
 - [ ] `--data-dir`, `CONTENT_FLOW_HOME`, and the repository-local default follow documented precedence.
@@ -40,8 +47,18 @@ python3 /home/barney/.codex/skills/.system/skill-creator/scripts/quick_validate.
 - [ ] `status` reports the active root and run state.
 - [ ] `validate` retains enum, gate, revision, filename, presence, and path/symlink checks.
 - [ ] `count` remains deterministic and offline.
-- [ ] `new-run --format readme`, status, validation, and resume mechanics work while
-  existing LinkedIn behavior remains valid.
+- [ ] `find` ranks titles, partial titles, phrases, aliases, topic words, modest spelling
+  variations, formats, finalization, explicit drafts, and recency across private runs and
+  vault material without embeddings, a database, or private tracked output.
+- [ ] `adapt` creates collision-safe linked destination state with source/final/hash/vault
+  provenance and prior-adaptation history, copies reusable shared evidence, preserves the
+  source final byte-for-byte, and supports both LinkedIn-to-X and X-to-LinkedIn.
+- [ ] Repeatable `--format`, optional `--primary-format`, X-only, LinkedIn-only,
+  README-only, and both social orderings work; duplicates and invalid primaries fail.
+- [ ] Shared artifacts occur once; per-format artifacts, variants, revision rounds, human
+  gates, finals, lessons, parking, and decline state remain independent.
+- [ ] X `single`, `thread`, and `standalone` recommended versions validate deterministically
+  per post; unfinished formats prevent completion.
 - [ ] Vault capture/show/list/update/rebuild/validate work under every data-root selector.
 - [ ] One or more vault items can start a run; run and item state link bidirectionally.
 - [ ] Parking preserves history and updates origins or creates one run-fragment; resume restores state; final linkage records successful usage and returns reusable items to ready.

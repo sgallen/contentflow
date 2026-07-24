@@ -8,114 +8,160 @@ interpretation, proposed angles, and open questions. Selecting one or more items
 normal run, moves selected items to `developing`, records bidirectional IDs, and preserves
 useful material in `spike.md`. See `VAULT.md` for schema and lifecycle.
 
-## Stage graph
+## Stage graph and format rendering
 
 ```text
-vault item -> selected_idea -> research_decision -> research? -> interview -> draft
-   ^                                                               ^          |
-   |                                                               |          v
-   +--------------------------- park -------------------------- council <-> revision
-                                                                   |  \-> research
-                                                                   v
-                                                              finalization -> lessons -> complete
+vault -> shared idea -> research decision -> research? -> interview -> content brief
+                                                               |
+                                                               v
+                         primary format: draft -> Council -> revision? -> final -> lessons
+                                                               |
+                                                               v
+                       secondary format(s): native adaptation -> independent gates -> final
 ```
 
-Research is conditional. Council findings can route to revision, interview, research, or final human review. Revision normally runs at most twice; unresolved issues then go to the human. Every backward route records its reason in the new or updated artifact and `run.json`. Parking is an explicit non-terminal route from any incomplete stage; it preserves the stage and every artifact.
+Research and interview are shared. For social runs, `content-brief.md` is channel-neutral:
+thesis, examples, evidence, creator reasoning, tension, payoff, creator wording,
+confidentiality, possible angles, and unresolved weaknesses. Rendering begins only after
+that shared substance exists. A designated primary is rendered first. An approved primary
+is useful selection evidence, but the brief and interview remain authoritative.
 
-## Reusable formats
+`linkedin`, `x`, and `readme` are supported. Repeat `--format` to request several outputs.
+README remains a repository-document overlay and is not automatically repurposed with
+social content. X supports `single`, `thread`, and `standalone`; an unspecified variant is
+recommended from the material and confirmed by the human rather than defaulting to a
+thread.
 
-`format` is either `linkedin` or `readme`. Both formats use the same stage graph, state
-vocabulary, artifact pointers, revision limit, validation, and human gates. Format-specific
-creator guidance lives at `<data-root>/creator/formats/<format>.md`.
+Format artifacts live under `formats/<format>/`. Every format owns its draft, Council,
+revision plan, revision round, final, lessons, variant/angle, status, and pending approval.
+No authorization crosses a format boundary. A run is complete only after every requested
+format is finalized, declined, or explicitly format-parked.
 
-A README run treats the target repository as source material. Before interviewing, inspect
-the current README, source tree, documentation, CLI help, tests, examples, and package
-metadata as relevant. Artifacts must distinguish repository-proven behavior, documentation
-claims, explicit owner intent, and unresolved uncertainty. The work remains private until
-the owner explicitly approves the visible final candidate for the exact target README.
+## Conversational adaptation entry
 
-## State vocabulary
+The normal entry for reuse is a request such as “Let's adapt the Bostrom post for X.”
+Content Flow resolves the active root, searches private run and vault material
+deterministically, reports the selected source, and continues without requiring internal
+identifiers. Exact and partial titles, topic words, recognizable phrases, people/concepts,
+aliases, spelling variations, explicit drafts, and recency descriptions are supported.
+Finalized content wins over unfinished drafts unless the human explicitly requests a
+draft.
 
-Valid `stage` values are `selected_idea`, `research_decision`, `research`, `interview`, `draft`, `council`, `revision`, `finalization`, `lessons`, and `complete`. Valid `status` values are `active`, `awaiting_human`, `parked`, and `complete`.
+One clearly strongest match proceeds. Several plausible matches produce one concise
+human-facing choice question. No credible match produces an honest summary of the private
+locations searched and a request for a phrase, title, link, or approximate date. Raw run
+IDs and private paths are reference details, not the main interaction.
 
-Valid `pending_human_action` values are:
+An existing unfinished destination state may be activated only when doing so preserves
+primary ordering and approvals. Otherwise `bin/cf adapt` creates a linked destination run.
+It records immutable source provenance, copies reusable shared evidence, links originating
+vault material, and creates a fresh independent format state. Repeating an adaptation
+never overwrites an earlier destination or source final.
 
-- `provide_idea_details`
-- `confirm_research_decision`
-- `answer_interview_question`
-- `review_draft`
-- `authorize_council`
-- `approve_revision_plan`
-- `resolve_revision_limit`
-- `approve_final`
-- `approve_lessons`
-- `confirm_route`
-- `resolve_research_scope`
-- `none`
+## Schema version 2
 
-The usual forward transitions are those in the graph. The only normal backward transitions are `draft|council|revision -> interview` and `draft|council|revision -> research`. `complete` is terminal unless the human explicitly reopens the run. `research_required` is `null` before a decision and a Boolean afterward. `revision_round` starts at `0`, increments only after an approved plan is applied, and may not exceed `2`.
-
-The `artifacts` object always contains these stable current-pointer keys: `spike`, `research`, `interview`, `brief`, `draft`, `council`, `revision_plan`, `revision`, `final`, and `lessons`. Values are run-root filenames or `null`. Semantic filenames are `spike.md`, `research-report.md`, `interview.md`, `content-brief.md`, `draft-NN.md`, `council-NN.md`, `revision-plan-NN.md`, `final.md`, and `lesson-candidates.md`. Preserve older versions under history keys `draft_N`, `council_N`, `revision_plan_N`, or `research_N`, which must point to the matching two-digit filename. Resolved paths must remain inside the run directory.
-
-A newly created run begins with this shape (legacy unlinked states may omit vault fields):
+Top-level routing uses ordered `requested_formats`, optional `primary_format`, and
+`active_format`. Shared development lives in `shared_state` and `shared_artifacts`.
+Independent rendering lives in `format_states`:
 
 ```json
 {
-  "id": "2026-07-22-example",
+  "schema_version": 2,
+  "id": "2026-07-24-example",
   "title": "Example",
-  "format": "linkedin",
-  "stage": "selected_idea",
+  "requested_formats": ["linkedin", "x"],
+  "primary_format": "linkedin",
+  "active_format": null,
   "status": "awaiting_human",
-  "research_required": null,
-  "revision_round": 0,
-  "pending_human_action": "provide_idea_details",
-  "origin_vault_items": [],
-  "contributing_vault_items": [],
-  "derived_vault_items": [],
-  "linked_vault_items": [],
-  "parking_reason": null,
-  "parked_at": null,
-  "final_artifact": null,
-  "artifacts": {
+  "shared_state": {
+    "stage": "selected_idea",
+    "status": "awaiting_human",
+    "research_required": null,
+    "pending_human_action": "provide_idea_details"
+  },
+  "shared_artifacts": {
     "spike": "spike.md",
     "research": null,
     "interview": null,
-    "brief": null,
-    "draft": null,
-    "council": null,
-    "revision_plan": null,
-    "revision": null,
-    "final": null,
-    "lessons": null
-  }
+    "brief": null
+  },
+  "format_states": {
+    "linkedin": {
+      "variant": null,
+      "angle": null,
+      "stage": "pending",
+      "status": "pending",
+      "revision_round": 0,
+      "pending_human_action": "none",
+      "disposition": "active",
+      "artifacts": {"draft": null, "council": null, "revision_plan": null,
+                    "revision": null, "final": null, "lessons": null},
+      "final_artifact": null
+    },
+    "x": {
+      "variant": null,
+      "angle": null,
+      "stage": "pending",
+      "status": "pending",
+      "revision_round": 0,
+      "pending_human_action": "none",
+      "disposition": "active",
+      "artifacts": {"draft": null, "council": null, "revision_plan": null,
+                    "revision": null, "final": null, "lessons": null},
+      "final_artifact": null
+    }
+  },
+  "origin_vault_items": [],
+  "contributing_vault_items": [],
+  "derived_vault_items": [],
+  "linked_vault_items": []
 }
 ```
 
-`origin_vault_items` identifies material whose selection directly initiated the run.
-`contributing_vault_items` identifies supporting material, including completed-content
-provenance reused as input. `derived_vault_items` identifies ideas captured during the run.
-`linked_vault_items` is their unique ordered union. Legacy states without these keys remain
-valid as unlinked runs. Every linked item reciprocally records the run ID. `parking_reason`
-and `parked_at` are required when status is `parked`; pre-park status/action fields support
-deterministic resume. `final_artifact` records the run-relative final path after vault
-final-linking.
+Shared stages are `selected_idea`, `research_decision`, `research`, `interview`,
+`content_brief`, and `complete`. Format stages are `pending`, `draft`, `council`,
+`revision`, `finalization`, `lessons`, `complete`, `declined`, and `parked`. Each format
+revision round starts at zero, increments only after an approved concrete plan creates the
+next draft, and stops at two.
 
-Use `status: awaiting_human` with a specific pending action, `active` with `pending_human_action: none` while Codex can continue, and `complete` only with the terminal stage. A stage is advanced after its required output artifact is durably written; while a human gate is pending, keep the last valid artifact-backed stage and record the pending action.
+Shared paths are run-root filenames. Format paths must resolve under the matching
+`formats/<format>/` directory. History pointers use the same numbered families as before.
+`bin/cf migrate-run <run>` reports the singular-schema migration; `--apply` moves only
+format-specific artifacts, preserves shared files, rewrites state and local vault final
+paths, and never fabricates another requested format.
 
-For `awaiting_human`, the allowed stage/action combinations are:
+Pending actions retain their meanings: idea details, research decision/scope, one
+interview answer, draft review, Council authorization, route confirmation, revision-plan
+approval, revision-limit resolution, final approval, and lesson approval. The pending
+state is stored only in the shared state or active format that owns the gate.
 
-| Stage | Allowed pending action |
-| --- | --- |
-| `selected_idea` | `provide_idea_details` |
-| `research_decision` | `confirm_research_decision` |
-| `research` | `resolve_research_scope` |
-| `interview` | `answer_interview_question` |
-| `draft` | `review_draft`, `authorize_council` |
-| `council` | `confirm_route`, `approve_final` |
-| `revision` | `approve_revision_plan`, `resolve_revision_limit`, `review_draft`, `authorize_council`, `approve_final` |
-| `lessons` | `approve_lessons` |
+### Adaptation
 
-`finalization` has no awaiting-human state because explicit approval occurs while the visible candidate remains at `council` or `revision`; after approval, Codex writes `final.md` and advances. `complete` always has `status: complete` and no pending action.
+Adaptation reloads the shared brief, useful research/interview evidence, approved primary,
+and destination guidance. It identifies the approved central framing, selects only useful
+examples, preserves factual/confidentiality constraints, and creates a native destination
+draft. Mechanical truncation, expansion, paragraph splitting, or reformatting is not
+adaptation. A secondary format gets its own Council, revision, final, and lessons.
+
+A linked adaptation run has one requested destination format and an `adaptation` object
+with the source reference, run/title/format, selected artifact and SHA-256, available
+source final, finalization state, destination and optional variant, source vault items,
+prior adaptation runs, and creation timestamp. Its copied interview and brief put shared
+development in `complete`; rendering starts fresh at `pending`. An unspecified X variant
+uses pending action `confirm_destination_variant` until the human approves the
+recommendation. `bin/cf set-x-variant` records that choice before any draft exists.
+
+Sparse destination guidance is a calibration state, not evidence of durable preference.
+Use creator-wide voice plus established format constraints, keep run conclusions
+tentative, and never promote them to persistent lessons without item-level approval.
+
+### X deterministic structure
+
+The canonical format specification is `creator/formats/x.md`; the mechanical command is
+`bin/cf validate-x FILE --variant <single|thread|standalone>`. The limit is defined once in
+the deterministic layer and surfaced by the template. Drafts/finals declare a variant and
+place validated posts under `## Recommended final version`. Threads use sequential posts;
+standalone outputs contain distinct self-contained angles.
 
 ## Explicit parking route
 
@@ -143,13 +189,13 @@ A run exists and the human has selected or supplied an idea.
 
 ### Inputs
 
-For LinkedIn, the supplied idea, title, any source note or vault item, and the human's
+For social content, the supplied idea, title, any source note or vault item, and the human's
 initial confidentiality guidance. For README, the target project, exact target README path,
 repository evidence, existing documentation, and initial confidentiality guidance.
 
 ### Task
 
-Clarify only what is necessary. For LinkedIn, record the idea, why it may be worth
+Clarify only what is necessary. For social content, record the idea, why it may be worth
 developing, provenance, assumptions, unresolved questions, and confidentiality concerns.
 For README, inspect first and record the project and target path, project purpose,
 repository evidence, documentation claims, owner intent, assumptions, unresolved questions,
@@ -162,7 +208,7 @@ claim to a proven fact.
 
 ### Exit condition
 
-The active format's spike fields are present with honest "unknown" or "none identified"
+The shared spike fields are present with honest "unknown" or "none identified"
 markers where needed.
 
 ### Possible routes
@@ -264,15 +310,15 @@ functional lens, material already obtained, missing coverage it targets, and
 After the human answers, replace the pending marker with the answer and record obtained
 material, remaining gaps, and the next interviewing move.
 
-For LinkedIn, useful lenses include direct thesis, concrete example, strongest objection,
+For social content, useful lenses include direct thesis, concrete example, strongest objection,
 uncomfortable/self-interested angle, personal significance, practical takeaway, and
 forward-looking implication. For README, useful lenses include primary audience, core
 problem, strongest value proposition, first reader action, maturity, differentiation,
 non-goals, trust or privacy, tone, and contribution posture. Do not use a fixed README
 questionnaire. Persona labels are optional mnemonics; always state their functional purpose.
 
-Stop on coverage rather than question count. Synthesize `content-brief.md` without
-fabricating a view. A README brief records target readers, primary promise, reader problem,
+Stop on coverage rather than question count. Synthesize channel-neutral social
+`content-brief.md` without fabricating a view or channel structure. A README brief records target readers, primary promise, reader problem,
 desired action, key proof, required sections, important commands, public claims requiring
 verification, tone, avoidances, limitations, and unresolved questions.
 
@@ -282,7 +328,7 @@ verification, tone, avoidances, limitations, and unresolved questions.
 
 ### Exit condition
 
-LinkedIn has a distinctive thesis, at least one concrete example, specificity and causal
+Social content has a distinctive thesis, at least one concrete example, specificity and causal
 detail, tension/disagreement/objection, and a useful payoff or implication. README has a
 supported project description, target reader, reader problem, primary promise, desired
 action, verified setup path, scope, limitations, and no blocking unresolved claim.
@@ -315,11 +361,15 @@ three hook options, one body, three closing options, and a recommended assembly.
 `bin/cf count draft-NN.md --section "Recommended assembled version"` for the post-body
 character count.
 
+For X, confirm `single`, `thread`, or `standalone` first. Use the canonical structure in
+`creator/formats/x.md`, validate every recommended post with `bin/cf validate-x`, identify
+thread-post functions or standalone angles, and report factual/confidentiality flags.
+
 For README, produce a complete proposed README grounded in repository evidence and owner
 input. The first screen should answer what the project is, why the reader should care, and
 how to try it. Include only useful sections from the format guidance. Verify copyable
-commands. Character counting remains available but is not a quality metric. For both
-formats, flag factual, confidentiality, and material uncertainty issues.
+commands. Character counting remains available but is not a quality metric. For every
+format, flag factual, confidentiality, and material uncertainty issues.
 
 ### Output artifact
 
@@ -359,6 +409,11 @@ technical accuracy, (5) trust and credibility, and (6) voice and readability. Id
 what works, blocking findings, consensus findings, optional taste suggestions, exact
 inaccurate claims or commands, and a ranked revision plan. Score each lens and an overall
 diagnostic score; scores guide discussion rather than assert objective quality.
+
+For X use: (1) immediate clarity, (2) strength of point of view, (3) compression, (4)
+specificity and credibility, (5) voice authenticity, and (6) platform fit. Explicitly
+separate unnecessary cleverness, generic engagement bait, unsupported claims, and
+repetition inherited from a primary format.
 
 ### Output artifact
 
@@ -422,6 +477,9 @@ For LinkedIn, create an immutable final copy, count its post body with
 `bin/cf count final.md --section "Approved post"`, and record selection, caveats, and
 approval. Do not publish.
 
+For X, preserve the confirmed variant and mechanically valid recommended-post structure.
+Re-run `bin/cf validate-x` and record per-post counts, flags, and explicit approval.
+
 For README, while the visible candidate still awaits `approve_final`, report the exact
 target path and show the complete final proposed content or exact diff. Only explicit
 approval of that candidate permits finalization. Then create `final.md` with the exact
@@ -432,7 +490,7 @@ commit. Council authorization, revision-plan approval, or approval of a differen
 candidate is not final approval.
 
 After writing and validating the final artifact, preserve all linked items and record the
-final path with `bin/cf vault finalize-run`. Record the run in each linked item's
+final path with `bin/cf vault finalize-run <run> --format <format>`. Record the run in each linked item's
 `successful_runs`, update `last_used_at`, preserve prior final paths, and count only
 successful completed uses. Non-archived origins, contributors, and derived ideas normally
 return to `ready`; another unfinished active run keeps them `developing`. Archived items
@@ -450,7 +508,7 @@ to a later run without copying the earlier run.
 ### Exit condition
 
 For LinkedIn, selected hook/closing, final character count, remaining factual caveats, and
-approval status are recorded. For README, `final.md` exactly matches the approved target
+approval status are recorded. For X, the variant and every post validate. For README, `final.md` exactly matches the approved target
 README content, the approval and target path are recorded in the preceding Council or
 revision artifact, and the approved target file alone has been updated.
 

@@ -54,11 +54,12 @@ Required fields:
 | `use_count` | non-negative integer equal to the number of `successful_runs` |
 | `derived_items` | related item IDs derived from this item |
 | `source_items` | related item IDs from which this item was derived |
-| `final_artifacts` | unique safe `runs/<run-id>/<filename>` references |
+| `final_artifacts` | unique safe `runs/<run-id>/formats/<format>/<filename>` references (legacy three-part paths remain readable for migration) |
 
 `derived_items` and `source_items` are subsets of `related_items` and reciprocal. Optional
 fields are `last_used_at`, `source_url`, `source_type`, `source_author`,
-`source_published_at` (ISO date or UTC timestamp), and `revisit_after` (ISO date).
+`source_published_at` (ISO date or UTC timestamp), `revisit_after` (ISO date), and
+duplicate-free string lists `aliases` / `alternate_titles`.
 `last_used_at` is present only after a successful completed use. Omit unknown optional
 metadata; never fabricate it. Exact supplied URLs are preserved.
 
@@ -103,10 +104,13 @@ Runs distinguish:
 - `derived_vault_items`: ideas captured during the run;
 - `linked_vault_items`: their ordered, duplicate-free union.
 
-Finalization adds the run to `successful_runs`, records its safe final path, updates
+Finalization adds the run to `successful_runs`, records each format-qualified final path, updates
 `last_used_at`, and derives `use_count` from successful runs. Repeating `finalize-run` is
-idempotent. A parked or abandoned run stays in `related_runs` but does not increase
-`use_count`.
+idempotent per artifact. One successful multi-format run still counts as one successful
+run while retaining several final artifacts. Format, X variant, and an explicitly recorded
+angle are written to development history so prior LinkedIn/X use and unexplored angles can
+be distinguished. A parked or abandoned run stays in `related_runs` but does not increase
+`use_count`; finalizing one format never consumes the item or blocks another.
 
 The smallest completed-content reuse design is to keep final paths on their existing
 origin and contributing items. Those items can later be selected as contributors, so the

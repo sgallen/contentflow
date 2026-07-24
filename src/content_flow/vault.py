@@ -41,6 +41,8 @@ VAULT_REQUIRED_KEYS = (
 VAULT_KEY_ORDER = (
     "id",
     "title",
+    "aliases",
+    "alternate_titles",
     "kind",
     "status",
     "captured_at",
@@ -69,6 +71,7 @@ VAULT_LIST_KEYS = (
     "source_items",
     "final_artifacts",
 )
+VAULT_OPTIONAL_LIST_KEYS = ("aliases", "alternate_titles")
 ITEM_ID_PATTERN = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
 TIMESTAMP_PATTERN = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
 DATE_PATTERN = re.compile(r"\d{4}-\d{2}-\d{2}")
@@ -279,6 +282,16 @@ def validate_metadata(metadata: dict[str, Any], path: Path | None = None) -> lis
             continue
         if len(values) != len(set(values)):
             errors.append(f"{key} must not contain duplicates")
+    for key in VAULT_OPTIONAL_LIST_KEYS:
+        if key not in metadata:
+            continue
+        values = metadata.get(key)
+        if not isinstance(values, list) or any(
+            not isinstance(value, str) or not value.strip() for value in values
+        ):
+            errors.append(f"{key} must be a list of non-empty strings when present")
+        elif len(values) != len(set(values)):
+            errors.append(f"{key} must not contain duplicates")
     for key in ("related_items", "derived_items", "source_items"):
         values = metadata.get(key)
         if not isinstance(values, list):
@@ -318,13 +331,23 @@ def validate_metadata(metadata: dict[str, Any], path: Path | None = None) -> lis
         artifact_runs: set[str] = set()
         for value in final_artifacts:
             artifact_path = Path(value)
+            legacy_shape = (
+                len(artifact_path.parts) == 3
+                and artifact_path.parts[0] == "runs"
+                and ITEM_ID_PATTERN.fullmatch(artifact_path.parts[1])
+            )
+            format_shape = (
+                len(artifact_path.parts) == 5
+                and artifact_path.parts[0] == "runs"
+                and ITEM_ID_PATTERN.fullmatch(artifact_path.parts[1])
+                and artifact_path.parts[2] == "formats"
+                and artifact_path.parts[3] in ("linkedin", "x", "readme")
+            )
             if (
                 artifact_path.is_absolute()
                 or ".." in artifact_path.parts
-                or len(artifact_path.parts) != 3
-                or artifact_path.parts[0] != "runs"
-                or not ITEM_ID_PATTERN.fullmatch(artifact_path.parts[1])
-                or artifact_path.parts[2] != artifact_path.name
+                or not (legacy_shape or format_shape)
+                or artifact_path.parts[-1] != artifact_path.name
                 or artifact_path.name in ("", ".", "..")
             ):
                 errors.append(f"unsafe final artifact path: {value}")
@@ -505,10 +528,7 @@ def validate_relationships(data_root: Path) -> tuple[list[str], list[str]]:
                     state = json.loads(state_path.read_text(encoding="utf-8"))
                 except (json.JSONDecodeError, UnicodeDecodeError):
                     continue
-                if not state.get("final_artifact") and state.get("status") in (
-                    "active",
-                    "awaiting_human",
-                ):
+                if state.get("status") in ("active", "awaiting_human"):
                     active = True
             if not active:
                 errors.append(f"{path}: developing item requires at least one active linked run")
@@ -523,9 +543,17 @@ def validate_relationships(data_root: Path) -> tuple[list[str], list[str]]:
                     state = json.loads(state_path.read_text(encoding="utf-8"))
                 except (json.JSONDecodeError, UnicodeDecodeError):
                     continue
-                current_final = state.get("final_artifact") or state.get("artifacts", {}).get("final")
-                current_reference = f"runs/{run_id}/{current_final}" if current_final else None
-                if current_reference not in metadata["final_artifacts"]:
+                current_references: list[str] = []
+                if state.get("schema_version") == 2:
+                    for format_state in state.get("format_states", {}).values():
+                        current_final = format_state.get("final_artifact")
+                        if current_final:
+                            current_references.append(f"runs/{run_id}/{current_final}")
+                else:
+                    current_final = state.get("final_artifact") or state.get("artifacts", {}).get("final")
+                    if current_final:
+                        current_references.append(f"runs/{run_id}/{current_final}")
+                if any(reference not in metadata["final_artifacts"] for reference in current_references):
                     errors.append(
                         f"{path}: current final artifact does not match successful run '{run_id}'"
                     )

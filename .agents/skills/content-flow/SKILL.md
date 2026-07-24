@@ -10,10 +10,68 @@ Act as one capable orchestrator. Council and interviewer personas are functional
 ## Start, resume, or report
 
 1. Run `bin/cf data-root` (or pass the user's `--data-dir` selection) and report the exact active data root. `DATA_ROOT.md` defines the canonical selection; do not reimplement it. If creator setup is incomplete, stop and direct the human to `$content-flow-setup` or `bin/cf init`.
-2. For a new run from supplied material, run `bin/cf new-run --title "..." --format <linkedin|readme>` with the same data-root selection; report its path. Fill its `spike.md` from the supplied idea or inspected project without inventing missing provenance, assumptions, capabilities, or confidentiality facts. For vault origins use the vault procedure below instead.
+2. For a new run from supplied material, run `bin/cf new-run --title "..." --format
+   <linkedin|x|readme>`; repeat `--format` for several outputs and optionally pass
+   `--primary-format <linkedin|x>`. Pass `--x-variant <single|thread|standalone>` only
+   when the human has selected it. Report the path. Fill shared `spike.md` without
+   inventing provenance, assumptions, capabilities, preferences, or confidentiality facts.
 3. For an existing run, read `<run>/run.json`, then read only artifacts relevant to its stage. Run `bin/cf validate <run>` with the same selection before advancing. A bare run ID belongs under `<data-root>/runs/`; an explicit path may identify a fictional example. Treat disk state, not chat memory, as authoritative.
 4. For status intent, run `bin/cf status <run>`, summarize the current artifact/state, pending human action, and valid next routes. Do not advance.
 5. Read `WORKFLOW.md` for the active stage contract. Read [references/state-and-artifacts.md](references/state-and-artifacts.md) when creating/updating state, and [references/artifact-templates.md](references/artifact-templates.md) when starting an artifact.
+
+## Adapt existing content conversationally
+
+Treat requests such as “adapt the Bostrom post for X,” “turn my latest LinkedIn post into
+an X thread,” or “create three standalone X posts from the agent-first piece” as complete
+adaptation intents. Do not ask for a run ID, artifact path, command, schema version, or
+workflow prompt.
+
+1. Resolve and report the active data root. Infer the requested destination and any
+   explicit variant from ordinary language. X, Twitter, single post, thread, and several
+   standalone posts are semantic intents, not required keywords. Ask one short question
+   only if the destination itself is genuinely ambiguous.
+2. Extract the human's source description and run `bin/cf find "<description>" --json`,
+   adding `--format`, `--variant`, `--latest`, or `--drafts` only when the request supplies that
+   constraint. Search results cover run titles/aliases, final and prior format artifacts,
+   spikes, briefs, linked vault titles/content/aliases, final-artifact lineage, and
+   development history. Do not substitute `vault list` or conversation memory for this
+   discovery step.
+3. If resolution is `clear`, briefly report the selected human-facing title, source
+   format, finalization state, and useful date. Do not expose the SOURCE_REF, run ID, or
+   private path unless it helps distinguish candidates. If resolution is `ambiguous`,
+   present only the likely human-readable candidates and ask one concise choice question.
+   If it is `none`, say that private runs, finalized/draft artifacts, briefs/spikes, and
+   vault material were searched, then ask for a title phrase, recognizable line, link, or
+   approximate date. Never guess or silently broaden to an unrelated topic.
+4. Read the selected source `run.json` and the artifacts it names. Load the shared brief,
+   research report, interview material, selected source-format final or explicitly
+   requested draft, linked vault material/provenance, useful prior Council findings, and
+   previous adaptations. The brief and original human input remain authoritative; the
+   approved source final is evidence of accepted framing and wording, not idea truth.
+5. If the destination is already an unfinished requested format in the source run and can
+   be activated without crossing approvals or invalidating a primary, use
+   `bin/cf format-action ... activate`. Otherwise use the selected SOURCE_REF with
+   `bin/cf adapt ... --to <linkedin|x>` after any required variant confirmation. The
+   linked initializer copies reusable shared evidence, records source/final/vault
+   provenance and prior adaptations, creates fresh destination state, and never changes
+   the source final. The human never chooses this storage mechanism.
+6. When X is requested without a variant, inspect the material and recommend `single`,
+   `thread`, or `standalone` in no more than a few sentences, then ask for confirmation
+   and stop. After confirmation, either pass `--x-variant` while initializing or use
+   `bin/cf set-x-variant <run> <variant>` on a pending adaptation. If the human explicitly
+   requested a variant, follow it unless the material clearly cannot support it; surface
+   that concern instead of silently changing formats.
+7. Before drafting, load `<data-root>/creator/profile.md`, `voice.md`, `lessons.md`, and
+   `formats/<destination>.md`. If destination evidence is sparse, say the platform voice
+   is still being calibrated, use the creator's general voice plus established platform
+   constraints, keep conclusions tentative, and propose no persistent lesson without
+   item-level approval. Unless private evidence establishes otherwise, stronger LinkedIn
+   evidence does not become an X rule.
+8. Draft natively for the destination from the shared substance and creator judgment. Do
+   not merely shorten, expand, split, or reformat the source final. Preserve factual and
+   confidentiality boundaries. Then stop for draft review and continue through the normal
+   independent Council authorization, revision-plan approval, final approval, and lesson
+   gates without asking the human to restate them.
 
 ## Capture, enrich, and inspect the private vault
 
@@ -55,7 +113,7 @@ require exact phrases.
 2. Create through the normal deterministic mechanism:
    `bin/cf new-run --vault-item <origin-id>`; repeat `--vault-item` for multiple direct
    origins and use repeated `--contributing-vault-item` for supporting items. Pass
-   `--format readme` when the intended output is a README.
+   every requested `--format`; use `--format readme` alone for the ordinary README workflow.
 3. Report the run path, verify reciprocal provenance with `bin/cf validate <run>` and
    `bin/cf vault validate`, then continue through the ordinary research decision and
    one-question-at-a-time interview. Never duplicate an existing item to start a run.
@@ -88,27 +146,72 @@ Preserve every run artifact and stop.
 ## Advance safely
 
 - Execute only the active stage or an explicitly valid route. Write the named artifact first, then update `run.json` atomically (temporary file plus rename), then validate.
-- Branch on `run.json` format while retaining the same stage graph, artifact names, and human gates. Load only the matching `creator/formats/<format>.md`.
+- Treat schema-version-2 disk state as authoritative. Shared development uses
+  `shared_state` and `shared_artifacts`; rendering uses only the selected entry in
+  `format_states`. Respect `primary_format` ordering and `active_format`. Never infer an
+  unrequested format or copy one format's approval state to another.
 - Research conditionally. Explain the decision briefly. Separate verified fact, citation, dispute, interpretation, and unresolved issue. Never use research to invent the creator's view.
 - During interview, choose one question, persist it in `interview.md` with its functional lens, obtained/missing coverage, and an `Answer: pending` marker, update and validate `run.json`, then ask it and stop. After the response, replace the pending marker with the answer and record material obtained, material missing, and the functional lens needed next. Stop on coverage rather than a fixed question count.
-- Load creator files only from `<data-root>/creator`: `profile.md`, `voice.md`, `lessons.md`, and the active `formats/<format>.md` for drafting or later voice/format evaluation; `sources.md` earlier only when its source policies matter.
+- Load creator files only from `<data-root>/creator`: `profile.md`, `voice.md`, `lessons.md`,
+  and the active `formats/<format>.md` for drafting or later evaluation; `sources.md`
+  earlier only when its policies matter. LinkedIn observations are not X rules.
 - Create real captured items only under `<data-root>/vault/items/`, optional available large material only under `<data-root>/vault/assets/<item-id>/`, and real runs only under `<data-root>/runs/`. Never write real content or copy private artifacts into tracked templates or `examples/`.
 - Run the six-lens Council only after clear human authorization. Produce one structured review and no automatic rewrite.
 - After Council feedback, write a concrete revision plan and stop. Interpret “apply” or equivalent approval as permission only for the visible pending plan; preserve the prior draft.
-- Increment `revision_round` only after an approved plan is applied. Limit revision to two rounds and use `resolve_revision_limit` rather than polishing indefinitely.
+- Increment only the active format's `revision_round` after its approved plan is applied.
+  Limit each format independently to two rounds.
 - Interpret “finalize” or equivalent as final approval only when the human is responding
   to a visible final candidate. Create `final.md`; never publish it. After validating it,
   report direct origins, contributing sources, and ideas derived during the run, then run
-  `bin/cf vault finalize-run <run>`. This records successful history for every linked role,
+  `bin/cf vault finalize-run <run> --format <format>`. This records successful history for every linked role,
   preserves all prior history, and normally returns non-archived items to `ready` without
   implying exhaustion. Ask whether the human wants the final piece independently
   discoverable as reusable content, but do not create another item without approval.
 - Propose at most five evidence-linked lessons after finalization. Never edit `<data-root>/creator/lessons.md` until the human explicitly approves individual candidates.
 
+## Shared development and social rendering
+
+For social runs, research and interview once. Keep `spike.md`, `research-report.md`,
+`interview.md`, and `content-brief.md` at the run root. The brief is channel-neutral and
+records the central thesis, strongest examples, factual support, creator reasoning,
+tension or objection, payoff, important interview wording, confidentiality constraints,
+possible angles, and unresolved weaknesses. It must not prescribe a LinkedIn hook,
+thread shape, or other channel structure.
+
+Render only requested formats under `formats/<format>/`. Each format owns drafts, Council
+reviews, revision plans, revisions, final, lessons, variant/angle, revision round, and
+human gate. The primary format, when present, is resolved first. The run completes only
+after every requested format is finalized, format-parked, or declined.
+
+When adapting from an approved primary or a linked prior run:
+
+1. Reload the shared brief and useful research/interview material.
+2. Load the approved primary as evidence of selected framing and language, not idea truth.
+3. Load destination guidance and identify the central idea that survived approval.
+4. For unspecified X output, recommend `single`, `thread`, or `standalone`, explain briefly,
+   ask for confirmation, persist the selection, and stop.
+5. Draft natively for the destination. Do not merely shorten, expand, split, or reformat;
+   do not add a point of view; preserve facts and confidentiality constraints.
+6. Run the destination's review, revisions, final approval, and lessons independently.
+
+For X, follow `creator/formats/x.md` and validate the recommended draft/final with
+`bin/cf validate-x <file> --variant <variant>`. A single may offer openings and an
+alternate close. A thread identifies each post's argumentative function and validates
+every post. Standalone posts use distinct angles and each stands alone. Run one authorized
+X Council through immediate clarity, point of view, compression, specificity/credibility,
+voice authenticity, and platform fit; distinguish blockers, consensus, taste,
+unnecessary cleverness, engagement bait, unsupported claims, inherited repetition, and
+diagnostic scores. Never revise automatically.
+
+Lesson candidates must declare one scope: creator-wide voice, social workflow, LinkedIn,
+X, README, or this run only. Never promote a format-specific preference to creator-wide
+guidance without item-level approval.
+
 ## README runs
 
-Use this overlay only when `run.json` has `format: readme`. It specializes the shared
-workflow rather than replacing it.
+Use this overlay only for a requested README output. A normal README run requests README
+alone; never treat it as a social adaptation unless the human explicitly requested the
+mixed run. It specializes the shared workflow rather than replacing it.
 
 1. Before interviewing, inspect the target project, current README if present, source tree,
    documentation, CLI help, tests, examples, and package metadata as relevant. Record the
